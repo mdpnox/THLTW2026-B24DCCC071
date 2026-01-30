@@ -3,29 +3,26 @@ import { useModel } from 'umi';
 import { useState, useMemo } from 'react';
 
 const ProductManagement = () => {
-  // Lấy dữ liệu và hàm từ model useStore
   const { products, updateProduct } = useModel('useStore');
   const [form] = Form.useForm();
   
-  // State quản lý Modal
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
 
-  // State cho tìm kiếm và lọc
   const [search, setSearch] = useState('');
   const [cat, setCat] = useState<string | null>(null);
   const [priceRange, setPriceRange] = useState([0, 50000000]);
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
 
-  // Hàm mở Modal và đổ dữ liệu vào Form
+
   const showEditModal = (record: any) => {
-    console.log('Đang bấm sửa sản phẩm:', record); // Kiểm tra xem hàm có chạy không
+    console.log('Đang bấm sửa sản phẩm:', record); 
     setEditingId(record.id);
-    form.setFieldsValue(record); // Đổ dữ liệu dòng hiện tại vào các ô nhập liệu
-    setIsModalOpen(true); // Mở Modal
+    form.setFieldsValue(record); 
+    setIsModalOpen(true); 
   };
 
-  // Hàm xử lý khi nhấn "Lưu lại" trên Modal
+  
   const handleUpdate = (values: any) => {
     if (editingId !== null) {
       updateProduct(editingId, values);
@@ -101,15 +98,15 @@ const ProductManagement = () => {
 
       <Table columns={columns} dataSource={filteredData} rowKey="id" pagination={{ pageSize: 5 }} />
 
-      {/* CỬA SỔ MODAL CHỈNH SỬA */}
+      {}
       <Modal 
         title="Chỉnh sửa thông tin sản phẩm" 
-        visible={isModalOpen} // Biến này quyết định modal hiện hay ẩn
-        onCancel={() => setIsModalOpen(false)} // Đóng modal khi bấm X hoặc nút Hủy
-        onOk={() => form.submit()} // Kích hoạt submit form khi bấm Lưu
+        visible={isModalOpen} 
+        onCancel={() => setIsModalOpen(false)} 
+        onOk={() => form.submit()} 
         okText="Lưu lại"
         cancelText="Hủy"
-        destroyOnClose // Xóa dữ liệu cũ khi đóng modal
+        destroyOnClose 
       >
         <Form form={form} layout="vertical" onFinish={handleUpdate}>
           <Form.Item name="name" label="Tên sản phẩm" rules={[{ required: true, message: 'Vui lòng nhập tên!' }]}>
