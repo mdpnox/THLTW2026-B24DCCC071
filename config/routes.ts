@@ -40,7 +40,17 @@
         icon: 'table', 
         component: './ProductList',
     },
-    // -----------------------
+    
+    {
+    path: '/quan-ly',
+    name: 'Quản lý Hệ thống',
+    icon: 'shop',
+    routes: [
+      { path: '/quan-ly/dashboard', name: 'Thống kê', component: './Dashboard' },
+      { path: '/quan-ly/san-pham', name: 'Sản phẩm', component: './ProductManagement' },
+      { path: '/quan-ly/don-hang', name: 'Đơn hàng', component: './OrderManagement' },
+    ],
+  },
 
     {
         path: '/notification',
