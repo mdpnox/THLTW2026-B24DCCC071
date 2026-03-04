@@ -35,6 +35,19 @@
     },
 
     {
+        path: '/bai-1',
+        name: 'Bài 1: Đoán số',
+        icon: 'QuestionCircleOutlined',
+        component: './Bai1',
+    },
+    {
+        path: '/bai-2',
+        name: 'Bài 2: Quản lý học tập',
+        icon: 'BookOutlined',
+        component: './Bai2',
+    },
+
+    {
         path: '/products',
         name: 'Quản lý sản phẩm',
         icon: 'table', 
