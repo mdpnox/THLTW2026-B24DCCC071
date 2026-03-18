@@ -82,17 +82,11 @@
 
 	{
     path: '/bai-1',
-    name: 'Bài 1: Oẳn Tù Tì',
+    name: 'Dịch vụ & Quản lý',
     icon: 'book',
     component: './Bai1',
   },
 
-  {
-    path: '/bai-2',
-    name: 'Bài 2: Quản lý Ngân hàng câu hỏi',
-    icon: 'book',
-    component: './Bai2',
-  },
 
 	{
 		path: '/',
