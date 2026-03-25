@@ -1,337 +1,512 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo } from 'react';
 
-
-type Service = { 
-  id: string; 
-  name: string; 
-  price: number; 
-  duration: number;
-  availableHours: string; 
-};
-type Staff = { id: string; name: string; maxPerDay: number; workHours: string };
-type AppointmentStatus = "Chờ duyệt" | "Xác nhận" | "Hoàn thành" | "Hủy";
-
-type Appointment = {
+interface Register {
   id: string;
-  customerName: string;
-  serviceId: string;
-  staffId: string;
-  date: string;
-  time: string;
-  status: AppointmentStatus;
-  rating?: number;
-  staffReply?: string;
-};
+  year: number;
+  currentRegNum: number;
+}
 
-type TabType = "book" | "list" | "stats" | "staff";
+interface Decision {
+  id: string;
+  decisionNumber: string;
+  issueDate: string;
+  summary: string;
+  registerId: string;
+  searchCount: number;
+}
 
-const INITIAL_SERVICES: Service[] = [
-  { id: "s1", name: "Cắt tóc", price: 100000, duration: 30, availableHours: "08:00-20:00" },
-  { id: "s2", name: "Spa thư giãn", price: 200000, duration: 60, availableHours: "10:00-18:00" },
-];
+type FieldType = 'String' | 'Number' | 'Date';
 
-const INITIAL_STAFF: Staff[] = [
-  { id: "st1", name: "Nguyen Linh", maxPerDay: 4, workHours: "09:00-17:00" },
-  { id: "st2", name: "Tran Minh", maxPerDay: 5, workHours: "08:00-16:00" },
-];
+interface FieldConfig {
+  id: string;
+  name: string;
+  type: FieldType;
+}
 
-export default function Bai1() {
-  const [activeTab, setActiveTab] = useState<TabType>("book");
-  const [appointments, setAppointments] = useState<Appointment[]>([]);
-  const [services] = useState(INITIAL_SERVICES);
-  const [staffs] = useState(INITIAL_STAFF);
+interface Diploma {
+  id: string;
+  decisionId: string;
+  registerId: string;
+  registerNumber: number;
+  serialNumber: string;
+  studentId: string;
+  fullName: string;
+  dob: string;
+  dynamicFields: Record<string, string | number>;
+}
 
-  const [form, setForm] = useState({
-    customerName: "",
-    serviceId: "s1",
-    staffId: "st1",
-    date: "",
-    time: "",
-  });
+export default function DiplomaManagementSystem() {
+  const [registers, setRegisters] = useState<Register[]>([]);
+  const [decisions, setDecisions] = useState<Decision[]>([]);
+  const [configs, setConfigs] = useState<FieldConfig[]>([]);
+  const [diplomas, setDiplomas] = useState<Diploma[]>([]);
 
+  const [activeTab, setActiveTab] = useState<'admin' | 'search'>('admin');
+  const [adminTab, setAdminTab] = useState<'register' | 'decision' | 'config' | 'diploma'>('register');
 
-  const toMinutes = (t: string) => {
-    const [h, m] = t.split(":").map(Number);
-    return h * 60 + m;
-  };
+ 
+  const RegisterManager = () => {
+    const [year, setYear] = useState(new Date().getFullYear());
 
-  const minutesToTime = (mins: number) => {
-    const h = Math.floor(mins / 60).toString().padStart(2, "0");
-    const m = (mins % 60).toString().padStart(2, "0");
-    return `${h}:${m}`;
-  };
-
-
-  const handleBook = (e: React.FormEvent) => {
-    e.preventDefault();
-    const service = services.find((s) => s.id === form.serviceId)!;
-    const staff = staffs.find((s) => s.id === form.staffId)!;
-
-    const [start, end] = staff.workHours.split("-");
-    if (toMinutes(form.time) < toMinutes(start) || toMinutes(form.time) + service.duration > toMinutes(end)) {
-      return alert(`Ngoài giờ làm việc của nhân viên ${staff.name} (${staff.workHours})`);
-    }
-
-    const [sStart, sEnd] = service.availableHours.split("-");
-    if (toMinutes(form.time) < toMinutes(sStart) || toMinutes(form.time) + service.duration > toMinutes(sEnd)) {
-      return alert(`Dịch vụ này chỉ phục vụ từ ${service.availableHours}`);
-    }
-
-    const isOverlap = appointments.some((a) => {
-      if (a.staffId !== form.staffId || a.date !== form.date || a.status === "Hủy") return false;
-      const oldSrv = services.find((s) => s.id === a.serviceId)!;
-      const s1 = toMinutes(a.time);
-      const e1 = s1 + oldSrv.duration;
-      const s2 = toMinutes(form.time);
-      const e2 = s2 + service.duration;
-      return s1 < e2 && s2 < e1;
-    });
-
-    if (isOverlap) return alert("Trùng lịch với lịch hẹn khác của nhân viên!");
-
-    setAppointments([...appointments, { id: Date.now().toString(), ...form, status: "Chờ duyệt" }]);
-    alert("Đặt lịch thành công!");
-    setForm({ ...form, customerName: "", time: "", date: "" });
-  };
-
-  const updateStatus = (id: string, status: AppointmentStatus) => {
-    setAppointments((prev) => prev.map((a) => (a.id === id ? { ...a, status } : a)));
-  };
-
-  const addRating = (id: string, rating: number) => {
-    setAppointments((prev) => prev.map((a) => (a.id === id ? { ...a, rating } : a)));
-  };
-
-  const addStaffReply = (id: string, reply: string) => {
-    if (!reply.trim()) return;
-    setAppointments((prev) => prev.map((a) => (a.id === id ? { ...a, staffReply: reply } : a)));
-  };
-
-  
-  const stats = useMemo(() => {
-    const done = appointments.filter((a) => a.status === "Hoàn thành");
-    const apptsByDate: Record<string, number> = {};
-    const apptsByMonth: Record<string, number> = {};
-    let totalRevenue = 0;
-    const revByService: Record<string, number> = {};
-    const revByStaff: Record<string, number> = {};
-
-    appointments.forEach(a => {
-      if (a.status !== "Hủy") {
-        apptsByDate[a.date] = (apptsByDate[a.date] || 0) + 1;
-        const month = a.date.substring(0, 7);
-        apptsByMonth[month] = (apptsByMonth[month] || 0) + 1;
+    const handleAdd = () => {
+      if (registers.some(r => r.year === year)) {
+        alert('Sổ của năm này đã tồn tại!');
+        return;
       }
-    });
+      setRegisters([...registers, { id: Date.now().toString(), year, currentRegNum: 1 }]);
+    };
 
-    done.forEach((a) => {
-      const s = services.find((x) => x.id === a.serviceId);
-      const price = s?.price || 0;
-      totalRevenue += price;
-      revByService[a.serviceId] = (revByService[a.serviceId] || 0) + price;
-      revByStaff[a.staffId] = (revByStaff[a.staffId] || 0) + price;
-    });
-
-    return { totalRevenue, revByService, revByStaff, apptsByDate, apptsByMonth };
-  }, [appointments, services]);
-
-  return (
-    <div className="container">
-    
-      <style>{`
-        .container { font-family: 'Segoe UI', sans-serif; max-width: 900px; margin: 30px auto; padding: 20px; background: #f4f7f6; min-height: 100vh; border-radius: 15px; }
-        .nav-tabs { display: flex; gap: 10px; margin-bottom: 25px; }
-        .tab-btn { flex: 1; padding: 12px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; background: white; color: #666; transition: 0.3s; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
-        .tab-btn.active { background: #007bff; color: white; transform: translateY(-2px); box-shadow: 0 4px 10px rgba(0,123,255,0.3); }
-        
-        .card { background: white; padding: 25px; border-radius: 12px; shadow: 0 4px 15px rgba(0,0,0,0.1); border-top: 5px solid #007bff; }
-        .form-group { margin-bottom: 15px; }
-        label { display: block; font-size: 14px; margin-bottom: 5px; font-weight: 600; color: #333; }
-        input, select { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; }
-        .btn-submit { width: 100%; background: #007bff; color: white; padding: 12px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; margin-top: 10px; }
-        
-        .appt-item { background: #fff; border: 1px solid #eee; padding: 15px; border-radius: 10px; margin-bottom: 15px; }
-        .appt-header { display: flex; justify-content: space-between; align-items: flex-start; }
-        .status-badge { font-size: 11px; padding: 4px 8px; border-radius: 20px; font-weight: bold; text-transform: uppercase; }
-        .status-chờ { background: #fff3cd; color: #856404; }
-        .status-xác { background: #cce5ff; color: #004085; }
-        .status-hoàn { background: #d4edda; color: #155724; }
-        .status-hủy { background: #f8d7da; color: #721c24; }
-
-        .reply-box { margin-top: 15px; padding-top: 10px; border-top: 1px dashed #ddd; }
-        .input-reply { background: #f0f7ff; border: 1px solid #cce5ff; margin-top: 5px; }
-        .staff-reply-text { background: #f8f9fa; padding: 10px; border-left: 4px solid #007bff; border-radius: 4px; font-style: italic; font-size: 14px; }
-
-        .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-        .stat-card { background: white; padding: 15px; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
-        .revenue-total { font-size: 24px; color: #28a745; font-weight: bold; text-align: center; margin-bottom: 20px; background: white; padding: 20px; border-radius: 10px; }
-        
-        .rating-star { color: #f39c12; font-weight: bold; font-size: 18px; }
-      `}</style>
-
-   
-      <div className="nav-tabs">
-        <button className={`tab-btn ${activeTab === 'book' ? 'active' : ''}`} onClick={() => setActiveTab('book')}>📅 Đặt Lịch</button>
-        <button className={`tab-btn ${activeTab === 'list' ? 'active' : ''}`} onClick={() => setActiveTab('list')}>📋 Danh Sách</button>
-        <button className={`tab-btn ${activeTab === 'stats' ? 'active' : ''}`} onClick={() => setActiveTab('stats')}>📊 Thống Kê</button>
-        <button className={`tab-btn ${activeTab === 'staff' ? 'active' : ''}`} onClick={() => setActiveTab('staff')}>👥 Nhân Viên</button>
+    return (
+      <div style={styles.section}>
+        <h3>Quản lý Sổ văn bằng</h3>
+        <div>
+          <input
+            type="number"
+            value={year}
+            onChange={(e) => setYear(Number(e.target.value))}
+            placeholder="Năm tốt nghiệp"
+            style={styles.input}
+          />
+          <button onClick={handleAdd} style={styles.button}>Thêm Sổ mới</button>
+        </div>
+        <ul style={styles.list}>
+          {registers.map(r => (
+            <li key={r.id}>Năm: <strong>{r.year}</strong> - Số vào sổ hiện tại đang chờ cấp: {r.currentRegNum}</li>
+          ))}
+        </ul>
       </div>
+    );
+  };
+
+
+  const DecisionManager = () => {
+    const [form, setForm] = useState({ decisionNumber: '', issueDate: '', summary: '', registerId: '' });
+
+    const handleAdd = () => {
+      if (!form.decisionNumber || !form.registerId) return alert('Vui lòng nhập đủ thông tin!');
+      setDecisions([...decisions, { id: Date.now().toString(), ...form, searchCount: 0 }]);
+      setForm({ decisionNumber: '', issueDate: '', summary: '', registerId: '' });
+    };
+
+    return (
+      <div style={styles.section}>
+        <h3>Quản lý Quyết định Tốt nghiệp</h3>
+        <div style={styles.formGrid}>
+          <input
+            placeholder="Số QĐ"
+            value={form.decisionNumber}
+            onChange={e => setForm({ ...form, decisionNumber: e.target.value })}
+            style={styles.input}
+          />
+          <input
+            type="date"
+            value={form.issueDate}
+            onChange={e => setForm({ ...form, issueDate: e.target.value })}
+            style={styles.input}
+          />
+          <input
+            placeholder="Trích yếu"
+            value={form.summary}
+            onChange={e => setForm({ ...form, summary: e.target.value })}
+            style={styles.input}
+          />
+          <select
+            value={form.registerId}
+            onChange={e => setForm({ ...form, registerId: e.target.value })}
+            style={styles.input}
+          >
+            <option value="">-- Chọn sổ văn bằng (Năm) --</option>
+            {registers.map(r => <option key={r.id} value={r.id}>Sổ năm {r.year}</option>)}
+          </select>
+          <button onClick={handleAdd} style={styles.button}>Thêm QĐ</button>
+        </div>
+        <ul style={styles.list}>
+          {decisions.map(d => {
+            const reg = registers.find(r => r.id === d.registerId);
+            return (
+              <li key={d.id}>
+                QĐ số: {d.decisionNumber} ({d.issueDate}) - Sổ: {reg?.year} - Lượt tra cứu: {d.searchCount}
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+    );
+  };
 
   
-      <div className="content">
-        
-       
-        {activeTab === "book" && (
-          <div className="card" style={{maxWidth: '500px', margin: '0 auto'}}>
-            <h2 style={{textAlign: 'center', marginTop: 0}}>Đặt Lịch Hẹn</h2>
-            <form onSubmit={handleBook}>
-              <div className="form-group">
-                <label>Tên khách hàng</label>
-                <input required placeholder="Nhập tên..." value={form.customerName} onChange={e => setForm({...form, customerName: e.target.value})} />
-              </div>
-              <div className="form-group">
-                <label>Dịch vụ (Khung giờ hoạt động)</label>
-                <select value={form.serviceId} onChange={e => setForm({...form, serviceId: e.target.value})}>
-                  {services.map(s => <option key={s.id} value={s.id}>{s.name} ({s.availableHours})</option>)}
-                </select>
-              </div>
-              <div className="form-group">
-                <label>Nhân viên thực hiện</label>
-                <select value={form.staffId} onChange={e => setForm({...form, staffId: e.target.value})}>
-                  {staffs.map(s => <option key={s.id} value={s.id}>{s.name} ({s.workHours})</option>)}
-                </select>
-              </div>
-              <div className="form-group" style={{display: 'flex', gap: '10px'}}>
-                <div style={{flex: 1}}>
-                  <label>Ngày</label>
-                  <input type="date" required value={form.date} onChange={e => setForm({...form, date: e.target.value})} />
-                </div>
-                <div style={{flex: 1}}>
-                  <label>Giờ</label>
-                  <input type="time" required value={form.time} onChange={e => setForm({...form, time: e.target.value})} />
-                </div>
-              </div>
-              <button className="btn-submit">Xác nhận đặt lịch</button>
-            </form>
-          </div>
-        )}
+  const ConfigManager = () => {
+    const [name, setName] = useState('');
+    const [type, setType] = useState<FieldType>('String');
+    const [editingId, setEditingId] = useState<string | null>(null);
+    const [editName, setEditName] = useState('');
+    const [editType, setEditType] = useState<FieldType>('String');
+
+    const handleAdd = () => {
+      if (!name) return;
+      setConfigs([...configs, { id: Date.now().toString(), name, type }]);
+      setName('');
+    };
+
+    const handleDelete = (id: string) => setConfigs(configs.filter(c => c.id !== id));
+
+    const startEdit = (config: FieldConfig) => {
+      setEditingId(config.id);
+      setEditName(config.name);
+      setEditType(config.type);
+    };
+
+    const saveEdit = () => {
+      if (!editName) return;
+      setConfigs(configs.map(c => c.id === editingId ? { ...c, name: editName, type: editType } : c));
+      setEditingId(null);
+    };
+
+    const cancelEdit = () => setEditingId(null);
+
+    return (
+      <div style={styles.section}>
+        <h3>Cấu hình Biểu mẫu Phụ lục</h3>
+        <div>
+          <input
+            placeholder="Tên trường"
+            value={name}
+            onChange={e => setName(e.target.value)}
+            style={styles.input}
+          />
+          <select value={type} onChange={e => setType(e.target.value as FieldType)} style={styles.input}>
+            <option value="String">Chuỗi (String)</option>
+            <option value="Number">Số (Number)</option>
+            <option value="Date">Ngày tháng (Date)</option>
+          </select>
+          <button onClick={handleAdd} style={styles.button}>Thêm trường</button>
+        </div>
+        <ul style={styles.list}>
+          {configs.map(c => (
+            <li key={c.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '5px' }}>
+              {editingId === c.id ? (
+                <>
+                  <input
+                    value={editName}
+                    onChange={e => setEditName(e.target.value)}
+                    style={styles.input}
+                  />
+                  <select
+                    value={editType}
+                    onChange={e => setEditType(e.target.value as FieldType)}
+                    style={styles.input}
+                  >
+                    <option value="String">String</option>
+                    <option value="Number">Number</option>
+                    <option value="Date">Date</option>
+                  </select>
+                  <button onClick={saveEdit} style={{ ...styles.button, backgroundColor: '#28a745' }}>Lưu</button>
+                  <button onClick={cancelEdit} style={styles.dangerBtn}>Hủy</button>
+                </>
+              ) : (
+                <>
+                  {c.name} - Kiểu: {c.type}
+                  <button onClick={() => startEdit(c)} style={{ ...styles.button, marginLeft: '10px', backgroundColor: '#ffc107', color: '#000' }}>Sửa</button>
+                  <button onClick={() => handleDelete(c.id)} style={styles.dangerBtn}>Xóa</button>
+                </>
+              )}
+            </li>
+          ))}
+        </ul>
+      </div>
+    );
+  };
+
+ 
+  const DiplomaManager = () => {
+    const [decisionId, setDecisionId] = useState('');
+    const [baseForm, setBaseForm] = useState({ serialNumber: '', studentId: '', fullName: '', dob: '' });
+    const [dynamicData, setDynamicData] = useState<Record<string, string>>({});
+
+    const validateDynamicFields = () => {
+      for (const config of configs) {
+        const value = dynamicData[config.id];
+        if (!value && value !== '') continue; 
+        if (config.type === 'Number') {
+          if (isNaN(Number(value))) {
+            alert(`Trường "${config.name}" phải là số.`);
+            return false;
+          }
+        } else if (config.type === 'Date') {
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+            alert(`Trường "${config.name}" phải có định dạng ngày (YYYY-MM-DD).`);
+            return false;
+          }
+        }
+      }
+      return true;
+    };
+
+    const handleAdd = () => {
+      if (!decisionId) return alert('Vui lòng chọn Quyết định tốt nghiệp!');
+      if (!baseForm.serialNumber || !baseForm.studentId) return alert('Vui lòng nhập Số hiệu văn bằng và Mã sinh viên!');
+      if (!validateDynamicFields()) return;
+
+      const decision = decisions.find(d => d.id === decisionId);
+      if (!decision) return;
+
+      const register = registers.find(r => r.id === decision.registerId);
+      if (!register) return;
+
+      const newDiploma: Diploma = {
+        id: Date.now().toString(),
+        decisionId,
+        registerId: register.id,
+        registerNumber: register.currentRegNum,
+        ...baseForm,
+        dynamicFields: { ...dynamicData }
+      };
+
+      setDiplomas([...diplomas, newDiploma]);
 
       
-        {activeTab === "list" && (
-          <div className="card">
-            <h2 style={{marginTop: 0}}>Lịch hẹn gần đây</h2>
-            {appointments.length === 0 && <p style={{textAlign: 'center', color: '#999'}}>Chưa có lịch hẹn nào được tạo.</p>}
-            {appointments.map(a => {
-              const service = services.find(s => s.id === a.serviceId);
-              const endTime = minutesToTime(toMinutes(a.time) + (service?.duration || 0));
-              return (
-                <div key={a.id} className="appt-item">
-                  <div className="appt-header">
-                    <div>
-                      <div style={{fontWeight: 'bold', fontSize: '17px'}}>{a.customerName} - <span style={{color: '#007bff'}}>{service?.name}</span></div>
-                      <div style={{fontSize: '13px', color: '#666', marginTop: '4px'}}>
-                        🕒 {a.time} - {endTime} | 📅 {a.date}
-                      </div>
-                      <span className={`status-badge status-${a.status.substring(0, 3).toLowerCase()}`}>{a.status}</span>
-                    </div>
-                    <div style={{display: 'flex', gap: '5px'}}>
-                      {a.status === "Chờ duyệt" && <button onClick={() => updateStatus(a.id, "Xác nhận")} style={{color: 'blue', cursor: 'pointer', border: '1px solid blue', background: 'none', borderRadius: '4px'}}>Duyệt</button>}
-                      {a.status === "Xác nhận" && <button onClick={() => updateStatus(a.id, "Hoàn thành")} style={{color: 'green', cursor: 'pointer', border: '1px solid green', background: 'none', borderRadius: '4px'}}>Xong</button>}
-                      {a.status !== "Hủy" && a.status !== "Hoàn thành" && <button onClick={() => updateStatus(a.id, "Hủy")} style={{color: 'red', cursor: 'pointer', border: '1px solid red', background: 'none', borderRadius: '4px'}}>Hủy</button>}
-                    </div>
-                  </div>
+      setRegisters(registers.map(r => r.id === register.id ? { ...r, currentRegNum: r.currentRegNum + 1 } : r));
 
-            
-                  {a.status === "Hoàn thành" && (
-                    <div className="reply-box">
-                      {!a.rating ? (
-                        <div>
-                          <label style={{fontSize: '12px', color: '#888'}}>Khách hàng đánh giá (1-5 sao):</label>
-                          <input type="number" min={1} max={5} style={{width: '100px'}} placeholder="Nhập sao..." onBlur={e => e.target.value && addRating(a.id, Number(e.target.value))} />
-                        </div>
-                      ) : (
-                        <div>
-                          <p style={{margin: '0 0 10px 0'}}>Khách đánh giá: <span className="rating-star">{a.rating} ⭐</span></p>
-                          {!a.staffReply ? (
-                            <div>
-                              <label style={{fontSize: '12px', color: '#007bff'}}>Nhân viên phản hồi khách hàng:</label>
-                              <input 
-                                className="input-reply" 
-                                placeholder="Nhập nội dung và nhấn Enter..." 
-                                onKeyDown={e => {
-                                  if (e.key === 'Enter') {
-                                    addStaffReply(a.id, e.currentTarget.value);
-                                    e.currentTarget.value = "";
-                                  }
-                                }}
-                              />
-                            </div>
-                          ) : (
-                            <div className="staff-reply-text">
-                              <strong>Phản hồi từ cửa hàng:</strong> {a.staffReply}
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
+      alert(`Thêm văn bằng thành công! Số vào sổ: ${register.currentRegNum}`);
+      setBaseForm({ serialNumber: '', studentId: '', fullName: '', dob: '' });
+      setDynamicData({});
+    };
 
-  
-        {activeTab === "stats" && (
-          <div>
-            <div className="revenue-total">Tổng Doanh Thu: {stats.totalRevenue.toLocaleString()} VNĐ</div>
-            <div className="stats-grid">
-              <div className="stat-card">
-                <h3>Doanh thu theo dịch vụ</h3>
-                {services.map(s => (
-                  <div key={s.id} style={{display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #eee'}}>
-                    <span>{s.name}</span>
-                    <span style={{fontWeight: 'bold'}}>{(stats.revByService[s.id] || 0).toLocaleString()}đ</span>
-                  </div>
-                ))}
+    const selectedRegister = useMemo(() => {
+      const dec = decisions.find(d => d.id === decisionId);
+      return registers.find(r => r.id === dec?.registerId);
+    }, [decisionId, decisions, registers]);
+
+    return (
+      <div style={styles.section}>
+        <h3>Nhập Thông tin Văn bằng mới</h3>
+        <select
+          value={decisionId}
+          onChange={e => setDecisionId(e.target.value)}
+          style={{ ...styles.input, width: '100%', marginBottom: 10 }}
+        >
+          <option value="">-- Chọn Quyết định Tốt nghiệp --</option>
+          {decisions.map(d => <option key={d.id} value={d.id}>QĐ: {d.decisionNumber}</option>)}
+        </select>
+
+        {decisionId && (
+          <div style={styles.formGrid}>
+            <input
+              value={selectedRegister?.currentRegNum || ''}
+              disabled
+              placeholder="Số vào sổ (Tự động)"
+              style={{ ...styles.input, backgroundColor: '#eee' }}
+              title="Không cho phép chỉnh sửa"
+            />
+            <input
+              placeholder="Số hiệu văn bằng"
+              value={baseForm.serialNumber}
+              onChange={e => setBaseForm({ ...baseForm, serialNumber: e.target.value })}
+              style={styles.input}
+            />
+            <input
+              placeholder="Mã sinh viên"
+              value={baseForm.studentId}
+              onChange={e => setBaseForm({ ...baseForm, studentId: e.target.value })}
+              style={styles.input}
+            />
+            <input
+              placeholder="Họ và tên"
+              value={baseForm.fullName}
+              onChange={e => setBaseForm({ ...baseForm, fullName: e.target.value })}
+              style={styles.input}
+            />
+            <input
+              type="date"
+              placeholder="Ngày sinh"
+              value={baseForm.dob}
+              onChange={e => setBaseForm({ ...baseForm, dob: e.target.value })}
+              style={styles.input}
+            />
+
+            {configs.map(c => (
+              <div key={c.id}>
+                <label style={{ fontSize: 12, display: 'block' }}>{c.name} ({c.type}):</label>
+                <input
+                  type={c.type === 'Number' ? 'number' : c.type === 'Date' ? 'date' : 'text'}
+                  value={dynamicData[c.id] || ''}
+                  onChange={e => setDynamicData({ ...dynamicData, [c.id]: e.target.value })}
+                  style={styles.input}
+                />
               </div>
-              <div className="stat-card">
-                <h3>Số lượng lịch (Theo ngày)</h3>
-                <div style={{maxHeight: '200px', overflow: 'auto'}}>
-                  {Object.entries(stats.apptsByDate).map(([date, count]) => (
-                    <div key={date} style={{display: 'flex', justifyContent: 'space-between', padding: '5px 0'}}>
-                      <span>{date}</span>
-                      <span style={{background: '#e9ecef', padding: '2px 8px', borderRadius: '10px', fontSize: '12px'}}>{count} khách</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+            ))}
 
-   
-        {activeTab === "staff" && (
-          <div className="card">
-            <h2>Đội ngũ nhân viên & Đánh giá</h2>
-            <div className="stats-grid">
-              {staffs.map(s => {
-                const ratings = appointments.filter(a => a.staffId === s.id && a.rating);
-                const avg = ratings.length ? (ratings.reduce((sum, a) => sum + (a.rating || 0), 0) / ratings.length).toFixed(1) : "0";
-                return (
-                  <div key={s.id} className="stat-card" style={{textAlign: 'center', border: '1px solid #eee'}}>
-                    <div style={{fontSize: '40px', marginBottom: '10px'}}>👤</div>
-                    <div style={{fontWeight: 'bold', fontSize: '18px'}}>{s.name}</div>
-                    <div style={{color: '#666', fontSize: '13px', margin: '5px 0'}}>Ca làm: {s.workHours}</div>
-                    <div className="rating-star" style={{fontSize: '20px'}}>{avg} ⭐</div>
-                    <div style={{fontSize: '12px', color: '#999'}}>(Từ {ratings.length} lượt khách)</div>
-                  </div>
-                );
-              })}
-            </div>
+            <button onClick={handleAdd} style={{ ...styles.button, gridColumn: '1 / -1' }}>Lưu Văn bằng</button>
           </div>
         )}
       </div>
+    );
+  };
+
+  
+  const LookupView = () => {
+    const [searchParams, setSearchParams] = useState({ serialNumber: '', registerNumber: '', studentId: '', fullName: '', dob: '' });
+    const [results, setResults] = useState<Diploma[]>([]);
+    const [hasSearched, setHasSearched] = useState(false);
+
+    const handleSearch = () => {
+      const filledParamsCount = Object.values(searchParams).filter(val => val.trim() !== '').length;
+      if (filledParamsCount < 2) {
+        alert('Yêu cầu nhập ít nhất 2 tham số để tra cứu!');
+        return;
+      }
+
+      const found = diplomas.filter(dip => {
+        let match = true;
+        if (searchParams.serialNumber && dip.serialNumber !== searchParams.serialNumber) match = false;
+        if (searchParams.registerNumber && dip.registerNumber.toString() !== searchParams.registerNumber) match = false;
+        if (searchParams.studentId && dip.studentId !== searchParams.studentId) match = false;
+        if (searchParams.fullName && !dip.fullName.toLowerCase().includes(searchParams.fullName.toLowerCase())) match = false;
+        if (searchParams.dob && dip.dob !== searchParams.dob) match = false;
+        return match;
+      });
+
+      setResults(found);
+      setHasSearched(true);
+
+      if (found.length > 0) {
+        const uniqueDecisionIds = Array.from(new Set(found.map(f => f.decisionId)));
+        setDecisions(prev => prev.map(dec =>
+          uniqueDecisionIds.includes(dec.id) ? { ...dec, searchCount: dec.searchCount + 1 } : dec
+        ));
+      }
+    };
+
+    return (
+      <div style={styles.section}>
+        <h2>Tra cứu thông tin văn bằng</h2>
+        <div style={styles.formGrid}>
+          <input
+            placeholder="Số hiệu văn bằng"
+            value={searchParams.serialNumber}
+            onChange={e => setSearchParams({ ...searchParams, serialNumber: e.target.value })}
+            style={styles.input}
+          />
+          <input
+            placeholder="Số vào sổ"
+            value={searchParams.registerNumber}
+            onChange={e => setSearchParams({ ...searchParams, registerNumber: e.target.value })}
+            style={styles.input}
+          />
+          <input
+            placeholder="Mã sinh viên"
+            value={searchParams.studentId}
+            onChange={e => setSearchParams({ ...searchParams, studentId: e.target.value })}
+            style={styles.input}
+          />
+          <input
+            placeholder="Họ và tên"
+            value={searchParams.fullName}
+            onChange={e => setSearchParams({ ...searchParams, fullName: e.target.value })}
+            style={styles.input}
+          />
+          <input
+            type="date"
+            value={searchParams.dob}
+            onChange={e => setSearchParams({ ...searchParams, dob: e.target.value })}
+            style={styles.input}
+          />
+          <button onClick={handleSearch} style={{ ...styles.button, gridColumn: '1 / -1', background: '#28a745' }}>
+            Tra Cứu
+          </button>
+        </div>
+
+        {hasSearched && (
+          <div style={{ marginTop: 20 }}>
+            <h3>Kết quả tìm kiếm ({results.length}):</h3>
+            {results.length === 0 ? (
+              <p>Không tìm thấy văn bằng nào khớp với dữ liệu.</p>
+            ) : (
+              results.map(dip => {
+                const dec = decisions.find(d => d.id === dip.decisionId);
+                return (
+                  <div key={dip.id} style={{ border: '1px solid #ddd', padding: 15, marginBottom: 10, borderRadius: 5 }}>
+                    <p>
+                      <strong>Họ tên:</strong> {dip.fullName} - <strong>MSV:</strong> {dip.studentId} - <strong>Ngày sinh:</strong> {dip.dob}
+                    </p>
+                    <p>
+                      <strong>Số vào sổ:</strong> {dip.registerNumber} - <strong>Số hiệu:</strong> {dip.serialNumber}
+                    </p>
+                    <p>
+                      <strong>Thuộc Quyết định:</strong> {dec?.decisionNumber} (Cấp ngày {dec?.issueDate})
+                    </p>
+                    <hr style={{ margin: '10px 0' }} />
+                    <p>
+                      <strong>Thông tin phụ lục:</strong>
+                    </p>
+                    <ul>
+                      {configs.map(c => (
+                        <li key={c.id}>
+                          {c.name}: {dip.dynamicFields[c.id] || 'N/A'}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  return (
+    <div style={{ fontFamily: 'Arial, sans-serif', maxWidth: 1000, margin: '0 auto', padding: 20 }}>
+      <h1 style={{ textAlign: 'center', color: '#333' }}>HỆ THỐNG QUẢN LÝ & TRA CỨU VĂN BẰNG</h1>
+
+      <div style={{ display: 'flex', gap: 10, marginBottom: 20, justifyContent: 'center' }}>
+        <button onClick={() => setActiveTab('admin')} style={activeTab === 'admin' ? styles.activeTab : styles.tab}>
+          Chuyên viên quản lý
+        </button>
+        <button onClick={() => setActiveTab('search')} style={activeTab === 'search' ? styles.activeTab : styles.tab}>
+          Tra cứu văn bằng
+        </button>
+      </div>
+
+      {activeTab === 'admin' ? (
+        <div style={{ border: '1px solid #ccc', padding: 20, borderRadius: 8 }}>
+          <div style={{ display: 'flex', gap: 10, marginBottom: 20, borderBottom: '2px solid #eee', paddingBottom: 10 }}>
+            <button onClick={() => setAdminTab('register')} style={adminTab === 'register' ? styles.subTabActive : styles.subTab}>
+              1. Quản lý Sổ
+            </button>
+            <button onClick={() => setAdminTab('decision')} style={adminTab === 'decision' ? styles.subTabActive : styles.subTab}>
+              2. Quyết định TN
+            </button>
+            <button onClick={() => setAdminTab('config')} style={adminTab === 'config' ? styles.subTabActive : styles.subTab}>
+              3. Cấu hình Mẫu
+            </button>
+            <button onClick={() => setAdminTab('diploma')} style={adminTab === 'diploma' ? styles.subTabActive : styles.subTab}>
+              4. Nhập Văn Bằng
+            </button>
+          </div>
+
+          {adminTab === 'register' && <RegisterManager />}
+          {adminTab === 'decision' && <DecisionManager />}
+          {adminTab === 'config' && <ConfigManager />}
+          {adminTab === 'diploma' && <DiplomaManager />}
+        </div>
+      ) : (
+        <LookupView />
+      )}
     </div>
   );
 }
+
+const styles: Record<string, React.CSSProperties> = {
+  section: { padding: '10px 0' },
+  input: { padding: '8px', border: '1px solid #ccc', borderRadius: '4px', marginRight: '10px', width: '200px', boxSizing: 'border-box' },
+  button: { padding: '8px 15px', backgroundColor: '#007BFF', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' },
+  dangerBtn: { padding: '4px 8px', backgroundColor: '#dc3545', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', marginLeft: '10px' },
+  list: { marginTop: '15px', lineHeight: '2' },
+  formGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '15px', alignItems: 'end' },
+  tab: { padding: '10px 20px', cursor: 'pointer', border: '1px solid #ccc', background: '#f8f9fa', borderRadius: '4px' },
+  activeTab: { padding: '10px 20px', cursor: 'pointer', border: '1px solid #007BFF', background: '#007BFF', color: 'white', borderRadius: '4px' },
+  subTab: { padding: '5px 10px', cursor: 'pointer', border: 'none', background: 'transparent', fontWeight: 'bold', color: '#555' },
+  subTabActive: { padding: '5px 10px', cursor: 'pointer', border: 'none', background: 'transparent', fontWeight: 'bold', color: '#007BFF', borderBottom: '2px solid #007BFF' }
+};

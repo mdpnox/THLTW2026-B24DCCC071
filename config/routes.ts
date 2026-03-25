@@ -82,7 +82,7 @@
 
 	{
     path: '/bai-1',
-    name: 'Dịch vụ & Quản lý',
+    name: 'Quản lý & Tra cứu văn bằng',
     icon: 'book',
     component: './Bai1',
   },
