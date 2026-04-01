@@ -82,7 +82,7 @@
 
 	{
     path: '/bai-1',
-    name: 'Quản lý & Tra cứu văn bằng',
+    name: 'Quản lý CLB',
     icon: 'book',
     component: './Bai1',
   },
