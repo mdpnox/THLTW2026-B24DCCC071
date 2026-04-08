@@ -82,7 +82,7 @@
 
 	{
     path: '/bai-1',
-    name: 'Quản lý CLB',
+    name: 'Ứng dụng lập kế hoạch du lịch',
     icon: 'book',
     component: './Bai1',
   },

@@ -1,599 +1,635 @@
-import React, { useState, useMemo } from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import React, { useState, useMemo, useEffect } from 'react';
+import {
+  Layout, Menu, Card, Row, Col, Select, InputNumber, Button,
+  List, Typography, Alert, Table, Modal, Form, Input, Space, Statistic, message,
+  Slider, Upload, Image, Collapse, Popconfirm, Dropdown
+} from 'antd';
+import {
+  HomeOutlined, CalendarOutlined, PieChartOutlined, SettingOutlined,
+  DeleteOutlined, UpOutlined, DownOutlined, PlusOutlined, EditOutlined,
+  UploadOutlined, SaveOutlined, PlusCircleOutlined, ArrowUpOutlined, ArrowDownOutlined
+} from '@ant-design/icons';
+import { PieChart, Pie, Cell, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend, ResponsiveContainer, LineChart, Line } from 'recharts';
 
-interface Club {
+const { Header, Content } = Layout;
+const { Title, Text } = Typography;
+const { Option } = Select;
+const { Panel } = Collapse;
+
+interface Destination {
   id: string;
-  avatar: string;
   name: string;
-  foundationDate: string;
+  location: string;
+  type: 'biển' | 'núi' | 'thành phố';
+  image: string;
+  rating: number;
   description: string;
-  president: string;
-  isActive: boolean;
+  visitTimeHours: number;
+  foodCost: number;
+  accommodationCost: number;
+  transportCost: number;
 }
 
-type AppStatus = 'Pending' | 'Approved' | 'Rejected';
-
-interface Application {
+interface SavedItinerary {
   id: string;
-  fullName: string;
-  email: string;
-  phone: string;
-  gender: 'Nam' | 'Nữ';
-  address: string;
-  skills: string;
-  clubId: string;
-  reason: string;
-  status: AppStatus;
-  note?: string;
+  date: string;
+  itineraryDays: string[][];
+  totalCost: number;
 }
 
-interface AuditLog {
-  id: string;
-  action: string;
-  timestamp: string;
-}
 
-const initialClubs: Club[] = [
-  { id: '1', avatar: 'https://avatars.githubusercontent.com/u/113708179?s=280&v=4', name: 'IT Club', foundationDate: '2020-01-01', description: '<strong>Câu lạc bộ Công nghệ thông tin</strong>', president: 'Nguyễn Văn A', isActive: true },
-  { id: '2', avatar: 'https://mir-s3-cdn-cf.behance.net/project_modules/1400/b1596660310817.5a4691f7e0479.jpg', name: 'Music Club', foundationDate: '2021-05-15', description: '<em>Câu lạc bộ Âm nhạc</em>', president: 'Trần Thị B', isActive: false },
+const initialDestinations: Destination[] = [
+  { id: '1', name: 'Vịnh Hạ Long', location: 'Quảng Ninh', type: 'biển', image: 'https://cdn.xanhsm.com/2025/02/c0c9124a-vinh-ha-long-1.jpg', rating: 4.8, description: 'Di sản thiên nhiên thế giới', visitTimeHours: 24, foodCost: 1000000, accommodationCost: 1500000, transportCost: 1500000 },
+  { id: '2', name: 'Sapa', location: 'Lào Cai', type: 'núi', image: 'https://vcdn1-dulich.vnecdn.net/2022/04/18/dulichSaPa-1650268886-1480-1650277620.png?w=0&h=0&q=100&dpr=2&fit=crop&s=JTUw8njZ_Glkqf1itzjObg', rating: 4.6, description: 'Thành phố trong sương', visitTimeHours: 48, foodCost: 800000, accommodationCost: 1200000, transportCost: 600000 },
+  { id: '3', name: 'Phố cổ Hội An', location: 'Quảng Nam', type: 'thành phố', image: 'https://daivietourist.vn/wp-content/uploads/2025/05/gioi-thieu-ve-pho-co-hoi-an-8.jpg', rating: 4.9, description: 'Di sản văn hóa thế giới', visitTimeHours: 12, foodCost: 500000, accommodationCost: 800000, transportCost: 300000 },
+  { id: '4', name: 'Phú Quốc', location: 'Kiên Giang', type: 'biển', image: 'https://bcp.cdnchinhphu.vn/334894974524682240/2025/6/23/phu-quoc-17506756503251936667562.jpg', rating: 4.7, description: 'Đảo ngọc', visitTimeHours: 72, foodCost: 2000000, accommodationCost: 3000000, transportCost: 1500000 },
+  { id: '5', name: 'Đà Lạt', location: 'Lâm Đồng', type: 'núi', image: 'https://vitracotour.com/wp-content/uploads/2024/02/du-lich-da-lat.jpg', rating: 4.3, description: 'Thành phố ngàn hoa', visitTimeHours: 48, foodCost: 2000000, accommodationCost: 1500000, transportCost: 1500000 },
 ];
 
-const initialApps: Application[] = [
-  { id: '1', fullName: 'Van Minh', email: 'c@gmail.com', phone: '0123456789', gender: 'Nam', address: 'Hà Nội', skills: 'Hát, Đàn', clubId: '2', reason: 'Giao lưu', status: 'Pending' },
-  { id: '2', fullName: 'Phuong Anh', email: 'd@gmail.com', phone: '0987654321', gender: 'Nữ', address: 'HCM', skills: 'Code React', clubId: '1', reason: 'Học hỏi', status: 'Pending' },
-  { id: '3', fullName: 'Minh Hoang', email: 'e@gmail.com', phone: '0111222333', gender: 'Nam', address: 'Đà Nẵng', skills: 'JS', clubId: '1', reason: 'Học hỏi', status: 'Approved' },
-  { id: '4', fullName: 'Pham Ngoc', email: 'f@gmail.com', phone: '0444555666', gender: 'Nữ', address: 'Hải Phòng', skills: 'Piano', clubId: '2', reason: 'Giao lưu', status: 'Approved' },
-];
+const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042'];
 
-export default function ClubManagementSystem() {
-  const [activeTab, setActiveTab] = useState<'clubs' | 'apps' | 'members' | 'reports'>('clubs');
+
+const getTravelTime = (from: Destination, to: Destination): number => {
+  if (!from || !to) return 0;
+  const hash = (from.name.length + to.name.length) % 5 + 1;
+  return hash;
+};
+
+
+const formatCurrency = (value: number) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(value);
+
+export default function TravelApp() {
+  const [currentTab, setCurrentTab] = useState('home');
+  const [destinations, setDestinations] = useState<Destination[]>(initialDestinations);
   
-  const [clubs, setClubs] = useState<Club[]>(initialClubs);
-  const [applications, setApplications] = useState<Application[]>(initialApps);
-  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
+  const [itineraryDays, setItineraryDays] = useState<string[][]>([]);
+  const [budgetLimit, setBudgetLimit] = useState<number>(10000000);
+  const [savedItineraries, setSavedItineraries] = useState<SavedItinerary[]>([]);
 
 
-  const [clubSearch, setClubSearch] = useState('');
-  const [appSearch, setAppSearch] = useState('');
+  useEffect(() => {
+    const stored = localStorage.getItem('travel_itineraries');
+    if (stored) {
+      setSavedItineraries(JSON.parse(stored));
+    }
+  }, []);
 
+  useEffect(() => {
+    localStorage.setItem('travel_itineraries', JSON.stringify(savedItineraries));
+  }, [savedItineraries]);
 
-  const [clubModal, setClubModal] = useState<{ isOpen: boolean; data: Club | null }>({ isOpen: false, data: null });
-  const [appModal, setAppModal] = useState<{ isOpen: boolean; data: Application | null }>({ isOpen: false, data: null });
-  const [membersModal, setMembersModal] = useState<{ isOpen: boolean; clubId: string }>({ isOpen: false, clubId: '' });
-  const [processModal, setProcessModal] = useState<{ isOpen: boolean; type: 'Approve' | 'Reject'; targetId: string | null }>({ isOpen: false, type: 'Approve', targetId: null });
-  const [logsModalOpen, setLogsModalOpen] = useState(false);
-
-
-  const [memberClubFilter, setMemberClubFilter] = useState<string>('');
-  const [selectedMemberKeys, setSelectedMemberKeys] = useState<string[]>([]);
-  const [changeClubModal, setChangeClubModal] = useState<{ isOpen: boolean; targetIds: string[] }>({ isOpen: false, targetIds: [] });
-  const [newClubId, setNewClubId] = useState<string>('');
-
-  const [rejectReason, setRejectReason] = useState('');
-  const [selectedRowKeys, setSelectedRowKeys] = useState<string[]>([]); // For Tab 2
-  const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
-
-
-  const handleSort = (key: string) => {
-    let direction: 'asc' | 'desc' = 'asc';
-    if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') direction = 'desc';
-    setSortConfig({ key, direction });
-  };
-
-  const getFilteredClubs = () => clubs.filter(c => 
-    c.name.toLowerCase().includes(clubSearch.toLowerCase()) || 
-    c.president.toLowerCase().includes(clubSearch.toLowerCase()) || 
-    c.foundationDate.includes(clubSearch)
-  );
-
-  const getFilteredApps = () => applications.filter(a =>
-    a.fullName.toLowerCase().includes(appSearch.toLowerCase()) ||
-    a.email.toLowerCase().includes(appSearch.toLowerCase()) ||
-    a.phone.includes(appSearch) ||
-    a.skills.toLowerCase().includes(appSearch.toLowerCase()) ||
-    a.address.toLowerCase().includes(appSearch.toLowerCase()) ||
-    a.reason.toLowerCase().includes(appSearch.toLowerCase())
-  );
-
-  const getSortedData = (data: any[]) => {
-    if (!sortConfig) return data;
-    return [...data].sort((a, b) => {
-      let aVal = a[sortConfig.key];
-      let bVal = b[sortConfig.key];
-      if (sortConfig.key === 'clubName') {
-        aVal = getClubName(a.clubId);
-        bVal = getClubName(b.clubId);
-      }
-      if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
-      if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
-      return 0;
-    });
-  };
-
-
-  const handleSaveClub = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const formData = new FormData(e.currentTarget);
-    const newClub: Club = {
-      id: clubModal.data ? clubModal.data.id : Math.random().toString(),
-      name: formData.get('name') as string,
-      avatar: formData.get('avatar') as string,
-      foundationDate: formData.get('foundationDate') as string,
-      president: formData.get('president') as string,
-      description: formData.get('description') as string,
-      isActive: formData.get('isActive') === 'on',
-    };
-    setClubs(clubModal.data ? clubs.map(c => c.id === newClub.id ? newClub : c) : [...clubs, newClub]);
-    setClubModal({ isOpen: false, data: null });
-  };
-
-  const handleDeleteClub = (id: string) => window.confirm('Xóa CLB này?') && setClubs(clubs.filter(c => c.id !== id));
-
-  const handleSaveApp = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const formData = new FormData(e.currentTarget);
-    const newApp: Application = {
-      id: appModal.data ? appModal.data.id : Math.random().toString(),
-      fullName: formData.get('fullName') as string,
-      email: formData.get('email') as string,
-      phone: formData.get('phone') as string,
-      gender: formData.get('gender') as 'Nam' | 'Nữ',
-      address: formData.get('address') as string,
-      skills: formData.get('skills') as string,
-      clubId: formData.get('clubId') as string,
-      reason: formData.get('reason') as string,
-      status: appModal.data ? appModal.data.status : 'Pending',
-      note: appModal.data ? appModal.data.note : '',
-    };
-    setApplications(appModal.data ? applications.map(a => a.id === newApp.id ? newApp : a) : [...applications, newApp]);
-    setAppModal({ isOpen: false, data: null });
-  };
-
-  const handleDeleteApp = (id: string) => window.confirm('Xóa đơn này?') && setApplications(applications.filter(a => a.id !== id));
-
-  const executeProcess = () => {
-    if (processModal.type === 'Reject' && !rejectReason.trim()) return alert('Hãy nhập lý do từ chối!');
-    const targetIds = processModal.targetId ? [processModal.targetId] : selectedRowKeys;
-    const now = new Date().toLocaleString('vi-VN');
-
-    const newApps = applications.map(app => {
-      if (targetIds.includes(app.id)) {
-        const actionText = processModal.type === 'Approve' ? 'duyệt' : 'từ chối';
-        const logMsg = `Admin đã ${actionText} đơn của [${app.fullName}] vào lúc ${now}${processModal.type === 'Reject' ? ` với lý do: ${rejectReason}` : ''}.`;
-        setAuditLogs(prev => [{ id: Math.random().toString(), action: logMsg, timestamp: now }, ...prev]);
-        return { ...app, status: processModal.type === 'Approve' ? 'Approved' : 'Rejected', note: processModal.type === 'Reject' ? rejectReason : app.note } as Application;
-      }
-      return app;
-    });
-
-    setApplications(newApps);
-    setSelectedRowKeys([]);
-    setProcessModal({ isOpen: false, type: 'Approve', targetId: null });
-    setRejectReason('');
-  };
-
-
-  const filteredMembers = useMemo(() => {
-    if (!memberClubFilter) return [];
-    return applications.filter(a => a.status === 'Approved' && a.clubId === memberClubFilter);
-  }, [applications, memberClubFilter]);
-
-  const handleSelectMember = (id: string) => setSelectedMemberKeys(prev => prev.includes(id) ? prev.filter(k => k !== id) : [...prev, id]);
+ 
+  const saveCurrentItinerary = () => {
+    if (itineraryDays.length === 0 || itineraryDays.every(day => day.length === 0)) {
+      message.warning('Chưa có điểm đến nào trong lịch trình');
+      return;
+    }
   
-  const handleSelectAllMembers = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSelectedMemberKeys(e.target.checked ? filteredMembers.map(m => m.id) : []);
-  };
-
-  const executeChangeClub = () => {
-    if (!newClubId) return alert('Hãy chọn Câu lạc bộ mới!');
-    
-    setApplications(apps => apps.map(app => 
-      changeClubModal.targetIds.includes(app.id) ? { ...app, clubId: newClubId } : app
-    ));
-    
-    setChangeClubModal({ isOpen: false, targetIds: [] });
-    setSelectedMemberKeys([]);
-    setNewClubId('');
-    alert('Đã chuyển Câu lạc bộ thành công!');
-  };
-
-
-  const stats = useMemo(() => {
-    let pending = 0, approved = 0, rejected = 0;
-    applications.forEach(a => {
-      if (a.status === 'Pending') pending++;
-      if (a.status === 'Approved') approved++;
-      if (a.status === 'Rejected') rejected++;
+    let totalCost = 0;
+    itineraryDays.forEach(day => {
+      day.forEach(id => {
+        const d = destinations.find(dest => dest.id === id);
+        if (d) totalCost += d.foodCost + d.accommodationCost + d.transportCost;
+      });
     });
-    return { totalClubs: clubs.length, pending, approved, rejected };
-  }, [applications, clubs]);
-
-  const chartData = useMemo(() => {
-    return clubs.map(club => {
-      const clubApps = applications.filter(a => a.clubId === club.id);
-      return {
-        name: club.name,
-        Pending: clubApps.filter(a => a.status === 'Pending').length,
-        Approved: clubApps.filter(a => a.status === 'Approved').length,
-        Rejected: clubApps.filter(a => a.status === 'Rejected').length,
-      };
-    });
-  }, [clubs, applications]);
-
-
-  const getClubName = (clubId: string) => clubs.find(c => c.id === clubId)?.name || '';
-  const getStatusTag = (status: string) => {
-    if (status === 'Approved') return <span className="tag tag-green">Approved</span>;
-    if (status === 'Rejected') return <span className="tag tag-red">Rejected</span>;
-    return <span className="tag tag-orange">Pending</span>;
+    const newItinerary: SavedItinerary = {
+      id: Date.now().toString(),
+      date: new Date().toISOString(),
+      itineraryDays: itineraryDays.map(day => [...day]), 
+      totalCost
+    };
+    setSavedItineraries(prev => [...prev, newItinerary]);
+    message.success('Đã lưu lịch trình!');
   };
 
-  return (
-    <div className="container">
-      <style>{`
-        .container { font-family: Arial, sans-serif; padding: 20px; max-width: 1200px; margin: auto; }
-        .tabs { border-bottom: 2px solid #ddd; margin-bottom: 20px; display: flex; gap: 10px; }
-        .tab-btn { padding: 10px 15px; font-size: 15px; border: none; background: #f8f9fa; cursor: pointer; border-radius: 4px 4px 0 0; outline: none; transition: 0.2s;}
-        .tab-btn:hover { background: #e2e6ea; }
-        .tab-btn.active { background: #007bff; color: white; font-weight: bold; }
-        .flex-between { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
-        .search-input { padding: 8px; border: 1px solid #ccc; border-radius: 4px; width: 300px; }
-        table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 14px; }
-        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
-        th { background-color: #f4f4f4; cursor: pointer; }
-        th:hover { background-color: #eaeaea; }
-        .btn { padding: 8px 12px; margin-right: 5px; cursor: pointer; border: none; border-radius: 4px; color: white; font-size: 14px; }
-        .btn-primary { background-color: #007bff; }
-        .btn-success { background-color: #28a745; }
-        .btn-danger { background-color: #dc3545; }
-        .btn-secondary { background-color: #6c757d; }
-        .btn-sm { padding: 4px 8px; font-size: 12px; }
-        .tag { padding: 4px 8px; border-radius: 12px; font-size: 12px; color: white; display: inline-block; }
-        .tag-green { background-color: #28a745; }
-        .tag-red { background-color: #dc3545; }
-        .tag-orange { background-color: #fd7e14; }
-        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; justify-content: center; align-items: center; z-index: 1000; }
-        .modal-content { background: white; padding: 20px; border-radius: 8px; width: 500px; max-width: 90%; max-height: 90vh; overflow-y: auto; }
-        .form-group { margin-bottom: 15px; }
-        .form-group label { display: block; margin-bottom: 5px; font-weight: bold; }
-        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
-        .modal-footer { margin-top: 20px; text-align: right; }
-        .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 30px; }
-        .stat-card { background: #f8f9fa; padding: 20px; border-radius: 8px; text-align: center; border: 1px solid #ddd; }
-        .stat-card h4 { margin: 0 0 10px 0; color: #555; }
-        .stat-card p { margin: 0; font-size: 24px; font-weight: bold; color: #007bff; }
-      `}</style>
 
-      <h2>Hệ Thống Quản Lý Câu Lạc Bộ</h2>
+  const HomeView = () => {
+    const [filterType, setFilterType] = useState<string>('all');
+    const [sortRating, setSortRating] = useState<string>('none');
+    const [priceRange, setPriceRange] = useState<[number, number]>([0, 10000000]);
 
-      <div className="tabs">
-        <button className={`tab-btn ${activeTab === 'clubs' ? 'active' : ''}`} onClick={() => setActiveTab('clubs')}>Danh sách CLB</button>
-        <button className={`tab-btn ${activeTab === 'apps' ? 'active' : ''}`} onClick={() => setActiveTab('apps')}>Quản lý Đơn đăng ký</button>
-        <button className={`tab-btn ${activeTab === 'members' ? 'active' : ''}`} onClick={() => setActiveTab('members')}>Quản lý Thành viên</button>
-        <button className={`tab-btn ${activeTab === 'reports' ? 'active' : ''}`} onClick={() => setActiveTab('reports')}>Báo cáo & Thống kê</button>
+    const filteredAndSorted = useMemo(() => {
+      let result = [...destinations];
+      if (filterType !== 'all') result = result.filter(d => d.type === filterType);
+      result = result.filter(d => {
+        const total = d.foodCost + d.accommodationCost + d.transportCost;
+        return total >= priceRange[0] && total <= priceRange[1];
+      });
+      if (sortRating === 'asc') result.sort((a, b) => a.rating - b.rating);
+      if (sortRating === 'desc') result.sort((a, b) => b.rating - a.rating);
+      return result;
+    }, [destinations, filterType, sortRating, priceRange]);
+
+    const addToItinerary = (id: string) => {
+
+      if (itineraryDays.length === 0) {
+        setItineraryDays([[id]]);
+      } else {
+        const newDays = [...itineraryDays];
+        newDays[0] = [...newDays[0], id];
+        setItineraryDays(newDays);
+      }
+      message.success('Đã thêm vào lịch trình (ngày 1)');
+    };
+
+    const maxPrice = Math.max(...destinations.map(d => d.foodCost + d.accommodationCost + d.transportCost), 10000000);
+
+    return (
+      <div>
+        <Title level={2}>Khám phá điểm đến</Title>
+        <Space style={{ marginBottom: 20 }} wrap>
+          <Select defaultValue="all" style={{ width: 150 }} onChange={setFilterType}>
+            <Option value="all">Loại hình</Option>
+            <Option value="biển">Biển</Option>
+            <Option value="núi">Núi</Option>
+            <Option value="thành phố">Thành phố</Option>
+          </Select>
+          <Select defaultValue="none" style={{ width: 150 }} onChange={setSortRating}>
+            <Option value="none">Rating ngẫu nhiên</Option>
+            <Option value="desc">Rating cao nhất</Option>
+            <Option value="asc">Rating thấp nhất</Option>
+          </Select>
+          <div style={{ width: 300 }}>
+            <Text>Khoảng giá (VNĐ): </Text>
+            <Slider range min={0} max={maxPrice} step={500000} value={priceRange} onChange={(val) => setPriceRange(val as [number, number])} tipFormatter={(val) => formatCurrency(val || 0)} />
+            <Text type="secondary">{formatCurrency(priceRange[0])} - {formatCurrency(priceRange[1])}</Text>
+          </div>
+        </Space>
+        <Row gutter={[16, 16]}>
+          {filteredAndSorted.map(dest => {
+            const totalPrice = dest.foodCost + dest.accommodationCost + dest.transportCost;
+            return (
+              <Col xs={24} sm={12} md={8} lg={6} key={dest.id}>
+                <Card hoverable cover={<img alt={dest.name} src={dest.image} style={{ height: 150, objectFit: 'cover' }} />} actions={[<Button type="primary" onClick={() => addToItinerary(dest.id)}>Thêm vào lịch trình</Button>]}>
+                  <Card.Meta title={dest.name} description={dest.location} />
+                  <div style={{ marginTop: 10 }}>
+                    <Text type="secondary">Loại: <strong style={{ textTransform: 'capitalize' }}>{dest.type}</strong></Text><br />
+                    <Text type="secondary">Đánh giá: <strong>{dest.rating} ⭐</strong></Text><br />
+                    <Text type="danger">Chi phí: <strong>{formatCurrency(totalPrice)}</strong></Text>
+                  </div>
+                </Card>
+              </Col>
+            );
+          })}
+        </Row>
       </div>
+    );
+  };
 
 
-      {activeTab === 'clubs' && (
-        <div>
-          <div className="flex-between">
-            <button className="btn btn-primary" onClick={() => setClubModal({ isOpen: true, data: null })}>+ Thêm mới CLB</button>
-            <input type="text" placeholder="Tìm kiếm CLB..." className="search-input" value={clubSearch} onChange={e => setClubSearch(e.target.value)} />
-          </div>
-          <table>
-            <thead>
-              <tr>
-                <th>Ảnh ĐD</th>
-                <th onClick={() => handleSort('name')}>Tên CLB {sortConfig?.key === 'name' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}</th>
-                <th onClick={() => handleSort('foundationDate')}>Ngày thành lập</th>
-                <th>Mô tả</th>
-                <th onClick={() => handleSort('president')}>Chủ nhiệm</th>
-                <th onClick={() => handleSort('isActive')}>Hoạt động</th>
-                <th>Thao tác</th>
-              </tr>
-            </thead>
-            <tbody>
-              {getSortedData(getFilteredClubs()).map(club => (
-                <tr key={club.id}>
-                  <td><img src={club.avatar} alt="avatar" width={40} /></td>
-                  <td>{club.name}</td>
-                  <td>{club.foundationDate}</td>
-                  <td><div dangerouslySetInnerHTML={{ __html: club.description }} /></td>
-                  <td>{club.president}</td>
-                  <td>{club.isActive ? <span className="tag tag-green">Có</span> : <span className="tag tag-red">Không</span>}</td>
-                  <td>
-                    <button className="btn btn-secondary btn-sm" onClick={() => setMembersModal({ isOpen: true, clubId: club.id })}>Thành viên</button>
-                    <button className="btn btn-primary btn-sm" onClick={() => setClubModal({ isOpen: true, data: club })}>Sửa</button>
-                    <button className="btn btn-danger btn-sm" onClick={() => handleDeleteClub(club.id)}>Xóa</button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+  const ItineraryView = () => {
+
+    const getDestById = (id: string) => destinations.find(d => d.id === id)!;
+
+    const addNewDay = () => {
+      setItineraryDays([...itineraryDays, []]);
+    };
+
+    const removeDay = (dayIndex: number) => {
+      const newDays = [...itineraryDays];
+      newDays.splice(dayIndex, 1);
+      setItineraryDays(newDays);
+    };
+
+    const moveDay = (dayIndex: number, direction: 'up' | 'down') => {
+      const newDays = [...itineraryDays];
+      const target = direction === 'up' ? dayIndex - 1 : dayIndex + 1;
+      if (target < 0 || target >= newDays.length) return;
+      [newDays[dayIndex], newDays[target]] = [newDays[target], newDays[dayIndex]];
+      setItineraryDays(newDays);
+    };
+
+    const addDestinationToDay = (dayIndex: number, destId: string) => {
+      const newDays = [...itineraryDays];
+      newDays[dayIndex] = [...newDays[dayIndex], destId];
+      setItineraryDays(newDays);
+    };
+
+    const removeDestinationFromDay = (dayIndex: number, destIndex: number) => {
+      const newDays = [...itineraryDays];
+      newDays[dayIndex] = newDays[dayIndex].filter((_, idx) => idx !== destIndex);
+      setItineraryDays(newDays);
+    };
+
+    const moveDestinationInDay = (dayIndex: number, destIndex: number, direction: 'up' | 'down') => {
+      const newDays = [...itineraryDays];
+      const day = newDays[dayIndex];
+      const target = direction === 'up' ? destIndex - 1 : destIndex + 1;
+      if (target < 0 || target >= day.length) return;
+      [day[destIndex], day[target]] = [day[target], day[destIndex]];
+      newDays[dayIndex] = day;
+      setItineraryDays(newDays);
+    };
+
+    const { totalVisitTime, totalTravelTime, totalHours, totalCost } = useMemo(() => {
+      let visit = 0;
+      let travel = 0;
+      let cost = 0;
+      const allDestIds: string[] = [];
+      itineraryDays.forEach(day => {
+        allDestIds.push(...day);
+      });
+      const allDests = allDestIds.map(id => getDestById(id)).filter(d => d);
+      for (let i = 0; i < allDests.length; i++) {
+        const d = allDests[i];
+        visit += d.visitTimeHours;
+        cost += d.foodCost + d.accommodationCost + d.transportCost;
+        if (i < allDests.length - 1) {
+          travel += getTravelTime(d, allDests[i + 1]);
+        }
+      }
+      return { totalVisitTime: visit, totalTravelTime: travel, totalHours: visit + travel, totalCost: cost };
+    }, [itineraryDays, destinations]);
+
+    const DestinationDropdown = ({ dayIndex, onClose }: { dayIndex: number; onClose: () => void }) => {
+      const availableDests = destinations.filter(dest => !itineraryDays[dayIndex]?.includes(dest.id));
+      return (
+        <div style={{ maxHeight: 200, overflowY: 'auto', minWidth: 200 }}>
+          {availableDests.length === 0 ? <Text>Đã có hết điểm đến</Text> : availableDests.map(dest => (
+            <div key={dest.id} style={{ padding: '8px 12px', cursor: 'pointer', borderBottom: '1px solid #f0f0f0' }} onClick={() => { addDestinationToDay(dayIndex, dest.id); onClose(); }}>
+              <strong>{dest.name}</strong> - {dest.location}
+            </div>
+          ))}
         </div>
-      )}
+      );
+    };
+
+    return (
+      <div>
+        <Title level={2}>Lịch trình của bạn (theo ngày)</Title>
+        <Card style={{ marginBottom: 20 }}>
+          <Space size="large" wrap>
+            <Statistic title="Tổng thời gian tham quan" value={`${totalVisitTime} giờ`} />
+            <Statistic title="Tổng thời gian di chuyển" value={`${totalTravelTime} giờ`} />
+            <Statistic title="Tổng thời gian (cả di chuyển)" value={`${totalHours} giờ`} />
+            <Statistic title="Tổng chi phí" value={formatCurrency(totalCost)} valueStyle={{ color: totalCost > budgetLimit ? '#cf1322' : '#3f8600' }} />
+          </Space>
+          <div style={{ marginTop: 16 }}>
+            <Button type="primary" icon={<SaveOutlined />} onClick={saveCurrentItinerary}>Lưu lịch trình này</Button>
+          </div>
+        </Card>
+
+        <div style={{ marginBottom: 16 }}>
+          <Button type="dashed" icon={<PlusCircleOutlined />} onClick={addNewDay}>Thêm ngày mới</Button>
+        </div>
+
+        <Collapse accordion defaultActiveKey={['0']}>
+          {itineraryDays.map((day, dayIdx) => (
+            <Panel
+              header={`Ngày ${dayIdx + 1} (${day.length} điểm đến)`}
+              key={dayIdx.toString()}
+              extra={
+                <Space>
+                  <Button size="small" icon={<ArrowUpOutlined />} disabled={dayIdx === 0} onClick={(e) => { e.stopPropagation(); moveDay(dayIdx, 'up'); }} />
+                  <Button size="small" icon={<ArrowDownOutlined />} disabled={dayIdx === itineraryDays.length - 1} onClick={(e) => { e.stopPropagation(); moveDay(dayIdx, 'down'); }} />
+                  <Popconfirm title="Xóa ngày này?" onConfirm={(e) => { e?.stopPropagation(); removeDay(dayIdx); }} okText="Xóa" cancelText="Hủy">
+                    <Button size="small" danger icon={<DeleteOutlined />} onClick={(e) => e.stopPropagation()} />
+                  </Popconfirm>
+                </Space>
+              }
+            >
+              <List
+                itemLayout="horizontal"
+                dataSource={day}
+                renderItem={(destId, destIdx) => {
+                  const dest = getDestById(destId);
+                  if (!dest) return null;
+                  return (
+                    <List.Item
+                      actions={[
+                        <Button size="small" icon={<UpOutlined />} disabled={destIdx === 0} onClick={() => moveDestinationInDay(dayIdx, destIdx, 'up')} />,
+                        <Button size="small" icon={<DownOutlined />} disabled={destIdx === day.length - 1} onClick={() => moveDestinationInDay(dayIdx, destIdx, 'down')} />,
+                        <Button size="small" danger icon={<DeleteOutlined />} onClick={() => removeDestinationFromDay(dayIdx, destIdx)} />
+                      ]}
+                    >
+                      <List.Item.Meta
+                        title={dest.name}
+                        description={`${dest.location} - Thời gian tham quan: ${dest.visitTimeHours}h - Chi phí: ${formatCurrency(dest.foodCost + dest.accommodationCost + dest.transportCost)}`}
+                      />
+                    </List.Item>
+                  );
+                }}
+                footer={
+                  <div style={{ marginTop: 8 }}>
+                    <Dropdown
+                      overlay={<DestinationDropdown dayIndex={dayIdx} onClose={() => {}} />}
+                      trigger={['click']}
+                      placement="bottomLeft"
+                    >
+                      <Button icon={<PlusOutlined />} size="small">Thêm điểm đến vào ngày này</Button>
+                    </Dropdown>
+                  </div>
+                }
+              />
+            </Panel>
+          ))}
+        </Collapse>
+        {itineraryDays.length === 0 && <Alert message="Chưa có ngày nào." type="info" />}
+      </div>
+    );
+  };
 
 
-      {activeTab === 'apps' && (
-        <div>
-          <div className="flex-between">
-            <div>
-              <button className="btn btn-primary" onClick={() => setAppModal({ isOpen: true, data: null })}>+ Thêm mới Đơn</button>
-              {selectedRowKeys.length > 0 && (
-                <>
-                  <button className="btn btn-success" onClick={() => setProcessModal({ isOpen: true, type: 'Approve', targetId: null })}>Duyệt ({selectedRowKeys.length})</button>
-                  <button className="btn btn-danger" onClick={() => setProcessModal({ isOpen: true, type: 'Reject', targetId: null })}>Từ chối ({selectedRowKeys.length})</button>
-                </>
+  const BudgetView = () => {
+
+    const totalCost = useMemo(() => {
+      let cost = 0;
+      itineraryDays.forEach(day => {
+        day.forEach(id => {
+          const d = destinations.find(dest => dest.id === id);
+          if (d) cost += d.foodCost + d.accommodationCost + d.transportCost;
+        });
+      });
+      return cost;
+    }, [itineraryDays, destinations]);
+
+    const totalFood = useMemo(() => {
+      let food = 0;
+      itineraryDays.forEach(day => day.forEach(id => { const d = destinations.find(dest => dest.id === id); if (d) food += d.foodCost; }));
+      return food;
+    }, [itineraryDays, destinations]);
+
+    const totalAcc = useMemo(() => {
+      let acc = 0;
+      itineraryDays.forEach(day => day.forEach(id => { const d = destinations.find(dest => dest.id === id); if (d) acc += d.accommodationCost; }));
+      return acc;
+    }, [itineraryDays, destinations]);
+
+    const totalTrans = useMemo(() => {
+      let trans = 0;
+      itineraryDays.forEach(day => day.forEach(id => { const d = destinations.find(dest => dest.id === id); if (d) trans += d.transportCost; }));
+      return trans;
+    }, [itineraryDays, destinations]);
+
+    const chartData = [
+      { name: 'Ăn uống', value: totalFood },
+      { name: 'Lưu trú', value: totalAcc },
+      { name: 'Di chuyển', value: totalTrans },
+    ];
+    const isOverBudget = totalCost > budgetLimit;
+
+    return (
+      <div>
+        <Title level={2}>Quản lý ngân sách</Title>
+        <div style={{ marginBottom: 20 }}>
+          <Text strong>Cài đặt ngân sách tối đa: </Text>
+          <InputNumber style={{ width: 200 }} value={budgetLimit} onChange={(val) => setBudgetLimit(val || 0)} step={500000} formatter={value => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')} /> VNĐ
+        </div>
+        {isOverBudget ? (
+          <Alert message="Vượt ngân sách!" description={`Lịch trình của bạn đã vượt quá ngân sách ${formatCurrency(totalCost - budgetLimit)}.`} type="error" showIcon style={{ marginBottom: 20 }} />
+        ) : (
+          <Alert message="Ngân sách an toàn" description={`Bạn còn dư ${formatCurrency(budgetLimit - totalCost)}.`} type="success" showIcon style={{ marginBottom: 20 }} />
+        )}
+        <Row gutter={32}>
+          <Col span={12}>
+            <Card title="Phân bổ ngân sách">
+              {totalCost === 0 ? <Text>Chưa có lịch trình nào.</Text> : (
+                <div style={{ height: 300 }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie data={chartData} cx="50%" cy="50%" outerRadius={100} fill="#8884d8" dataKey="value" label>
+                        {chartData.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
+                      </Pie>
+                      <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                      <Legend />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
               )}
-            </div>
-            <div>
-              <input type="text" placeholder="Tìm kiếm đơn..." className="search-input" value={appSearch} onChange={e => setAppSearch(e.target.value)} />
-              <button className="btn btn-secondary" onClick={() => setLogsModalOpen(true)} style={{ marginLeft: 10 }}>Lịch sử</button>
-            </div>
-          </div>
-          <table>
-            <thead>
-              <tr>
-                <th><input type="checkbox" onChange={e => setSelectedRowKeys(e.target.checked ? applications.map(a => a.id) : [])} checked={applications.length > 0 && selectedRowKeys.length === applications.length} /></th>
-                <th onClick={() => handleSort('fullName')}>Họ tên {sortConfig?.key === 'fullName' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}</th>
-                <th onClick={() => handleSort('email')}>Email</th>
-                <th onClick={() => handleSort('phone')}>SĐT</th>
-                <th onClick={() => handleSort('gender')}>Giới tính</th>
-                <th onClick={() => handleSort('address')}>Địa chỉ</th>
-                <th onClick={() => handleSort('skills')}>Sở trường</th>
-                <th onClick={() => handleSort('clubName')}>CLB đăng ký</th>
-                <th onClick={() => handleSort('reason')}>Lý do đăng ký</th>
-                <th onClick={() => handleSort('status')}>Trạng thái</th>
-                <th>Ghi chú</th>
-                <th>Thao tác</th>
-              </tr>
-            </thead>
-            <tbody>
-              {getSortedData(getFilteredApps()).map(app => (
-                <tr key={app.id}>
-                  <td><input type="checkbox" checked={selectedRowKeys.includes(app.id)} onChange={() => setSelectedRowKeys(prev => prev.includes(app.id) ? prev.filter(k => k !== app.id) : [...prev, app.id])} /></td>
-                  <td>{app.fullName}</td>
-                  <td>{app.email}</td>
-                  <td>{app.phone}</td>
-                  <td>{app.gender}</td>
-                  <td>{app.address}</td>
-                  <td>{app.skills}</td>
-                  <td>{getClubName(app.clubId)}</td>
-                  <td>{app.reason}</td>
-                  <td>{getStatusTag(app.status)}</td>
-                  <td>{app.note}</td>
-                  <td>
-                      <button className="btn btn-primary btn-sm" onClick={() => setAppModal({ isOpen: true, data: app })}>Sửa</button>
-                      <button className="btn btn-danger btn-sm" onClick={() => handleDeleteApp(app.id)}>Xóa</button>
-                      {app.status === 'Pending' && (
-                        <>
-                          <button className="btn btn-success btn-sm" onClick={() => setProcessModal({ isOpen: true, type: 'Approve', targetId: app.id })}>Duyệt</button>
-                          <button className="btn btn-danger btn-sm" onClick={() => setProcessModal({ isOpen: true, type: 'Reject', targetId: app.id })}>Từ chối</button>
-                        </>
-                      )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+            </Card>
+          </Col>
+          <Col span={12}>
+            <Card title="Số liệu chi tiết">
+              <List dataSource={chartData} renderItem={(item, index) => (
+                <List.Item>
+                  <Text><span style={{ display: 'inline-block', width: 12, height: 12, backgroundColor: COLORS[index], marginRight: 8 }}></span>{item.name}</Text>
+                  <strong>{formatCurrency(item.value)}</strong>
+                </List.Item>
+              )} />
+              <div style={{ marginTop: 20, textAlign: 'right' }}>
+                <Title level={4}>Tổng cộng: <span style={{ color: isOverBudget ? 'red' : 'green' }}>{formatCurrency(totalCost)}</span></Title>
+              </div>
+            </Card>
+          </Col>
+        </Row>
+      </div>
+    );
+  };
 
 
-      {activeTab === 'members' && (
-        <div>
-          <div className="flex-between">
-            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-              <label style={{ fontWeight: 'bold' }}>Chọn CLB để xem thành viên:</label>
-              <select className="search-input" value={memberClubFilter} onChange={e => { setMemberClubFilter(e.target.value); setSelectedMemberKeys([]); }}>
-                <option value="">-- Chọn Câu lạc bộ --</option>
-                {clubs.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
-            </div>
-            {selectedMemberKeys.length > 0 && (
-              <button className="btn btn-primary" onClick={() => setChangeClubModal({ isOpen: true, targetIds: selectedMemberKeys })}>
-                Đổi CLB cho ({selectedMemberKeys.length}) thành viên đã chọn
-              </button>
-            )}
-          </div>
+  const AdminView = () => {
+    const [isModalVisible, setIsModalVisible] = useState(false);
+    const [form] = Form.useForm();
+    const [editingId, setEditingId] = useState<string | null>(null);
+    const [imageBase64, setImageBase64] = useState<string>('');
 
-          {memberClubFilter ? (
-            <table>
-              <thead>
-                <tr>
-                  <th><input type="checkbox" onChange={handleSelectAllMembers} checked={filteredMembers.length > 0 && selectedMemberKeys.length === filteredMembers.length} /></th>
-                  <th onClick={() => handleSort('fullName')}>Họ tên</th>
-                  <th onClick={() => handleSort('email')}>Email</th>
-                  <th onClick={() => handleSort('phone')}>SĐT</th>
-                  <th onClick={() => handleSort('gender')}>Giới tính</th>
-                  <th onClick={() => handleSort('address')}>Địa chỉ</th>
-                  <th onClick={() => handleSort('skills')}>Sở trường</th>
-                  <th>Thao tác</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredMembers.length > 0 ? filteredMembers.map(member => (
-                  <tr key={member.id}>
-                    <td><input type="checkbox" checked={selectedMemberKeys.includes(member.id)} onChange={() => handleSelectMember(member.id)} /></td>
-                    <td>{member.fullName}</td>
-                    <td>{member.email}</td>
-                    <td>{member.phone}</td>
-                    <td>{member.gender}</td>
-                    <td>{member.address}</td>
-                    <td>{member.skills}</td>
-                    <td>
-                      <button className="btn btn-secondary btn-sm" onClick={() => setChangeClubModal({ isOpen: true, targetIds: [member.id] })}>Chuyển CLB</button>
-                    </td>
-                  </tr>
-                )) : <tr><td colSpan={8} style={{ textAlign: 'center' }}>CLB này chưa có thành viên nào.</td></tr>}
-              </tbody>
-            </table>
-          ) : (
-            <p style={{ textAlign: 'center', color: '#666', marginTop: 40 }}>Vui lòng chọn Câu lạc bộ ở dropdown trên để xem danh sách thành viên.</p>
-          )}
-        </div>
-      )}
+    const handleDelete = (id: string) => {
+      setDestinations(destinations.filter(d => d.id !== id));
+
+      const newDays = itineraryDays.map(day => day.filter(destId => destId !== id));
+      setItineraryDays(newDays.filter(day => day.length > 0));
+    };
+
+    const openModal = (dest?: Destination) => {
+      if (dest) {
+        setEditingId(dest.id);
+        form.setFieldsValue(dest);
+        setImageBase64(dest.image);
+      } else {
+        setEditingId(null);
+        form.resetFields();
+        setImageBase64('');
+      }
+      setIsModalVisible(true);
+    };
+
+    const handleUpload = (file: File) => {
+      const reader = new FileReader();
+      reader.onload = (e) => setImageBase64(e.target?.result as string);
+      reader.readAsDataURL(file);
+      return false;
+    };
+
+    const handleSave = (values: any) => {
+      const newDestination = {
+        ...values,
+        id: editingId || Math.random().toString(),
+        image: imageBase64 || 'https://picsum.photos/300/200',
+        rating: values.rating || 0
+      };
+      if (editingId) {
+        setDestinations(destinations.map(d => d.id === editingId ? newDestination : d));
+      } else {
+        setDestinations([...destinations, newDestination]);
+      }
+      setIsModalVisible(false);
+      message.success('Đã lưu điểm đến!');
+    };
 
 
-      {activeTab === 'reports' && (
-        <div>
-          <div className="stats-grid">
-            <div className="stat-card"><h4>Tổng số CLB</h4><p>{stats.totalClubs}</p></div>
-            <div className="stat-card"><h4>Đơn Pending</h4><p style={{ color: '#fd7e14' }}>{stats.pending}</p></div>
-            <div className="stat-card"><h4>Đơn Approved</h4><p style={{ color: '#28a745' }}>{stats.approved}</p></div>
-            <div className="stat-card"><h4>Đơn Rejected</h4><p style={{ color: '#dc3545' }}>{stats.rejected}</p></div>
-          </div>
+    const stats = useMemo(() => {
+      const monthlyCount: { [key: string]: number } = {};
+      const monthlyRevenue: { [key: string]: number } = {};
+      const destCount: { [id: string]: number } = {};
+      let totalFood = 0, totalAcc = 0, totalTrans = 0;
 
-          <h3>Biểu đồ Đơn đăng ký theo từng CLB</h3>
-          <div style={{ width: '100%', height: 400, background: '#fff', padding: '20px', borderRadius: '8px', border: '1px solid #ddd', boxSizing: 'border-box' }}>
+      savedItineraries.forEach(itinerary => {
+        const date = new Date(itinerary.date);
+        const monthKey = `${date.getFullYear()}-${date.getMonth() + 1}`;
+        monthlyCount[monthKey] = (monthlyCount[monthKey] || 0) + 1;
+        monthlyRevenue[monthKey] = (monthlyRevenue[monthKey] || 0) + itinerary.totalCost;
+
+
+        const allDestIds = (itinerary.itineraryDays || []).flat();
+        allDestIds.forEach(destId => {
+          destCount[destId] = (destCount[destId] || 0) + 1;
+          const dest = destinations.find(d => d.id === destId);
+          if (dest) {
+            totalFood += dest.foodCost;
+            totalAcc += dest.accommodationCost;
+            totalTrans += dest.transportCost;
+          }
+        });
+      });
+
+      let mostPopularId = '';
+      let maxCount = 0;
+      Object.entries(destCount).forEach(([id, count]) => {
+        if (count > maxCount) { maxCount = count; mostPopularId = id; }
+      });
+      const mostPopularDest = destinations.find(d => d.id === mostPopularId);
+
+      const chartMonthly = Object.keys(monthlyCount).map(month => ({
+        month,
+        count: monthlyCount[month],
+        revenue: monthlyRevenue[month]
+      })).sort((a, b) => a.month.localeCompare(b.month));
+
+      const categoryData = [
+        { name: 'Ăn uống', value: totalFood },
+        { name: 'Lưu trú', value: totalAcc },
+        { name: 'Di chuyển', value: totalTrans },
+      ];
+
+      return {
+        totalItineraries: savedItineraries.length,
+        monthlyData: chartMonthly,
+        mostPopular: mostPopularDest?.name || 'Chưa có dữ liệu',
+        categoryData,
+        totalRevenue: savedItineraries.reduce((sum, i) => sum + i.totalCost, 0)
+      };
+    }, [savedItineraries, destinations]);
+
+    const columns = [
+      { title: 'Tên địa điểm', dataIndex: 'name', key: 'name' },
+      { title: 'Vị trí', dataIndex: 'location', key: 'location' },
+      { title: 'Loại', dataIndex: 'type', key: 'type', render: (text: string) => <span style={{ textTransform: 'capitalize' }}>{text}</span> },
+      { title: 'Thời gian (h)', dataIndex: 'visitTimeHours', key: 'visitTimeHours' },
+      { title: 'Hành động', key: 'action', render: (_: any, record: Destination) => (
+          <Space>
+            <Button icon={<EditOutlined />} onClick={() => openModal(record)} />
+            <Button danger icon={<DeleteOutlined />} onClick={() => handleDelete(record.id)} />
+          </Space>
+        ),
+      },
+    ];
+
+    return (
+      <div>
+        <Title level={2}>Trang Quản trị (Admin)</Title>
+        <Card title="Thống kê tổng quan" style={{ marginBottom: 20 }}>
+          <Row gutter={16}>
+            <Col span={6}><Statistic title="Tổng điểm đến" value={destinations.length} /></Col>
+            <Col span={6}><Statistic title="Tổng lịch trình đã lưu" value={stats.totalItineraries} /></Col>
+            <Col span={6}><Statistic title="Địa điểm phổ biến nhất" value={stats.mostPopular} /></Col>
+            <Col span={6}><Statistic title="Tổng doanh thu (VNĐ)" value={formatCurrency(stats.totalRevenue)} /></Col>
+          </Row>
+          <div style={{ height: 300, marginTop: 40 }}>
+            <Title level={5}>Số lượt lịch trình theo tháng</Title>
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+              <BarChart data={stats.monthlyData}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" />
+                <XAxis dataKey="month" />
                 <YAxis />
                 <Tooltip />
-                <Legend />
-                <Bar dataKey="Pending" fill="#fd7e14" name="Đang chờ (Pending)" />
-                <Bar dataKey="Approved" fill="#28a745" name="Đã duyệt (Approved)" />
-                <Bar dataKey="Rejected" fill="#dc3545" name="Từ chối (Rejected)" />
+                <Bar dataKey="count" fill="#8884d8" name="Số lượt" />
               </BarChart>
             </ResponsiveContainer>
           </div>
-        </div>
-      )}
-
-
-      {changeClubModal.isOpen && (
-        <div className="modal-overlay">
-          <div className="modal-content">
-            <h3>Chuyển Câu lạc bộ</h3>
-            <p>Bạn đang chọn chuyển CLB cho <b>{changeClubModal.targetIds.length}</b> thành viên.</p>
-            <div className="form-group">
-              <label>Chọn Câu lạc bộ mới đến:</label>
-              <select value={newClubId} onChange={e => setNewClubId(e.target.value)}>
-                <option value="">-- Chọn CLB --</option>
-                {clubs.filter(c => c.id !== memberClubFilter).map(c => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
-            </div>
-            <div className="modal-footer">
-              <button className="btn btn-secondary" onClick={() => setChangeClubModal({ isOpen: false, targetIds: [] })}>Hủy</button>
-              <button className="btn btn-primary" onClick={executeChangeClub}>Xác nhận chuyển</button>
-            </div>
+          <div style={{ height: 300, marginTop: 40 }}>
+            <Title level={5}>Doanh thu theo tháng (VNĐ)</Title>
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={stats.monthlyData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="month" />
+                <YAxis tickFormatter={(val) => formatCurrency(val)} />
+                <Tooltip formatter={(val: number) => formatCurrency(val)} />
+                <Line type="monotone" dataKey="revenue" stroke="#ff7300" name="Doanh thu" />
+              </LineChart>
+            </ResponsiveContainer>
           </div>
-        </div>
-      )}
-
-
-      {membersModal.isOpen && (
-        <div className="modal-overlay">
-          <div className="modal-content">
-            <h3>Thành viên đã duyệt</h3>
-            <ul>
-              {applications.filter(a => a.clubId === membersModal.clubId && a.status === 'Approved').map(member => (
-                <li key={member.id}>{member.fullName} - {member.email} ({member.skills})</li>
-              ))}
-              {applications.filter(a => a.clubId === membersModal.clubId && a.status === 'Approved').length === 0 && <li>Chưa có thành viên nào.</li>}
-            </ul>
-            <div className="modal-footer">
-              <button className="btn btn-secondary" onClick={() => setMembersModal({ isOpen: false, clubId: '' })}>Đóng</button>
-            </div>
+          <div style={{ height: 300, marginTop: 40 }}>
+            <Title level={5}>Số tiền theo từng hạng mục (từ các lịch trình đã lưu)</Title>
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie data={stats.categoryData} cx="50%" cy="50%" outerRadius={100} dataKey="value" label>
+                  {stats.categoryData.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
+                </Pie>
+                <Tooltip formatter={(val: number) => formatCurrency(val)} />
+                <Legend />
+              </PieChart>
+            </ResponsiveContainer>
           </div>
+        </Card>
+        <Card title="Quản lý điểm đến" extra={<Button type="primary" icon={<PlusOutlined />} onClick={() => openModal()}>Thêm điểm đến</Button>}>
+          <Table dataSource={destinations} columns={columns} rowKey="id" />
+        </Card>
+        <Modal title={editingId ? "Sửa điểm đến" : "Thêm điểm đến mới"} visible={isModalVisible} onCancel={() => setIsModalVisible(false)} onOk={() => form.submit()} width={600}>
+          <Form form={form} layout="vertical" onFinish={handleSave}>
+            <Form.Item name="name" label="Tên điểm đến" rules={[{ required: true }]}><Input /></Form.Item>
+            <Form.Item name="location" label="Vị trí (Tỉnh/Thành)" rules={[{ required: true }]}><Input /></Form.Item>
+            <Form.Item name="type" label="Loại hình" rules={[{ required: true }]}>
+              <Select><Option value="biển">Biển</Option><Option value="núi">Núi</Option><Option value="thành phố">Thành phố</Option></Select>
+            </Form.Item>
+            <Form.Item name="description" label="Mô tả"><Input.TextArea rows={3} /></Form.Item>
+            <Form.Item name="visitTimeHours" label="Thời gian tham quan (giờ)" rules={[{ required: true }]}><InputNumber style={{ width: '100%' }} /></Form.Item>
+            <Form.Item name="foodCost" label="Phí ăn uống (VNĐ)" rules={[{ required: true }]}><InputNumber style={{ width: '100%' }} /></Form.Item>
+            <Form.Item name="accommodationCost" label="Phí lưu trú (VNĐ)" rules={[{ required: true }]}><InputNumber style={{ width: '100%' }} /></Form.Item>
+            <Form.Item name="transportCost" label="Phí di chuyển (VNĐ)" rules={[{ required: true }]}><InputNumber style={{ width: '100%' }} /></Form.Item>
+            <Form.Item name="rating" label="Đánh giá (1-5)"><InputNumber min={1} max={5} step={0.1} style={{ width: '100%' }} /></Form.Item>
+            <Form.Item label="Hình ảnh">
+              <Upload beforeUpload={handleUpload} showUploadList={false} accept="image/*">
+                <Button icon={<UploadOutlined />}>Chọn ảnh</Button>
+              </Upload>
+              {imageBase64 && <Image src={imageBase64} width={100} style={{ marginTop: 10 }} />}
+            </Form.Item>
+          </Form>
+        </Modal>
+      </div>
+    );
+  };
+
+  return (
+    <Layout style={{ minHeight: '100vh' }}>
+      <Header style={{ display: 'flex', alignItems: 'center' }}>
+
+        <Menu theme="dark" mode="horizontal" selectedKeys={[currentTab]} onClick={(e) => setCurrentTab(e.key)} style={{ flex: 1 }}
+          items={[
+            { key: 'home', icon: <HomeOutlined />, label: 'Khám phá' },
+            { key: 'itinerary', icon: <CalendarOutlined />, label: 'Lịch trình' },
+            { key: 'budget', icon: <PieChartOutlined />, label: 'Ngân sách' },
+            { key: 'admin', icon: <SettingOutlined />, label: 'Admin' },
+          ]}
+        />
+      </Header>
+      <Content style={{ padding: '24px 50px', background: '#f5f5f5' }}>
+        <div style={{ background: '#fff', padding: 24, minHeight: 400, borderRadius: 8 }}>
+          {currentTab === 'home' && <HomeView />}
+          {currentTab === 'itinerary' && <ItineraryView />}
+          {currentTab === 'budget' && <BudgetView />}
+          {currentTab === 'admin' && <AdminView />}
         </div>
-      )}
-
-
-      {clubModal.isOpen && (
-        <div className="modal-overlay">
-          <div className="modal-content">
-            <h3>{clubModal.data ? 'Chỉnh sửa CLB' : 'Thêm mới CLB'}</h3>
-            <form onSubmit={handleSaveClub}>
-              <div className="form-group"><label>Tên CLB</label><input type="text" name="name" required defaultValue={clubModal.data?.name} /></div>
-              <div className="form-group"><label>URL Ảnh đại diện</label><input type="text" name="avatar" defaultValue={clubModal.data?.avatar} /></div>
-              <div className="form-group"><label>Ngày thành lập</label><input type="date" name="foundationDate" required defaultValue={clubModal.data?.foundationDate} /></div>
-              <div className="form-group"><label>Chủ nhiệm</label><input type="text" name="president" defaultValue={clubModal.data?.president} /></div>
-              <div className="form-group"><label>Mô tả (HTML)</label><textarea name="description" rows={3} defaultValue={clubModal.data?.description} /></div>
-              <div className="form-group"><label><input type="checkbox" name="isActive" defaultChecked={clubModal.data ? clubModal.data.isActive : true} /> Đang hoạt động</label></div>
-              <div className="modal-footer">
-                <button type="button" className="btn btn-secondary" onClick={() => setClubModal({ isOpen: false, data: null })}>Hủy</button>
-                <button type="submit" className="btn btn-primary">Lưu</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-
-      {appModal.isOpen && (
-        <div className="modal-overlay">
-          <div className="modal-content">
-            <h3>{appModal.data ? 'Chỉnh sửa Đơn' : 'Thêm mới Đơn'}</h3>
-            <form onSubmit={handleSaveApp}>
-              <div className="form-group"><label>Họ tên</label><input type="text" name="fullName" required defaultValue={appModal.data?.fullName} /></div>
-              <div className="form-group"><label>Email</label><input type="email" name="email" defaultValue={appModal.data?.email} /></div>
-              <div className="form-group"><label>SĐT</label><input type="text" name="phone" defaultValue={appModal.data?.phone} /></div>
-              <div className="form-group">
-                <label>Giới tính</label>
-                <select name="gender" defaultValue={appModal.data?.gender || 'Nam'}>
-                  <option value="Nam">Nam</option><option value="Nữ">Nữ</option><option value="Khác">Khác</option>
-                </select>
-              </div>
-              <div className="form-group"><label>Địa chỉ</label><input type="text" name="address" defaultValue={appModal.data?.address} /></div>
-              <div className="form-group"><label>Sở trường</label><input type="text" name="skills" defaultValue={appModal.data?.skills} /></div>
-              <div className="form-group">
-                <label>Câu lạc bộ</label>
-                <select name="clubId" required defaultValue={appModal.data?.clubId}>
-                  <option value="">-- Chọn CLB --</option>
-                  {clubs.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
-              </div>
-              <div className="form-group"><label>Lý do</label><textarea name="reason" rows={2} defaultValue={appModal.data?.reason} /></div>
-              <div className="modal-footer">
-                <button type="button" className="btn btn-secondary" onClick={() => setAppModal({ isOpen: false, data: null })}>Hủy</button>
-                <button type="submit" className="btn btn-primary">Lưu</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-
-      {processModal.isOpen && (
-        <div className="modal-overlay">
-          <div className="modal-content">
-            <h3>Xác nhận {processModal.type === 'Approve' ? 'Duyệt' : 'Từ chối'}</h3>
-            <p>Bạn có chắc chắn muốn {processModal.type === 'Approve' ? 'duyệt' : 'từ chối'} {processModal.targetId ? 'đơn này' : `${selectedRowKeys.length} đơn đã chọn`}?</p>
-            {processModal.type === 'Reject' && (
-              <div className="form-group">
-                <label style={{ color: 'red' }}>Lý do từ chối (*)</label>
-                <textarea rows={3} value={rejectReason} onChange={e => setRejectReason(e.target.value)} placeholder="Bắt buộc nhập lý do..." />
-              </div>
-            )}
-            <div className="modal-footer">
-              <button className="btn btn-secondary" onClick={() => setProcessModal({ isOpen: false, type: 'Approve', targetId: null })}>Hủy</button>
-              <button className={`btn ${processModal.type === 'Approve' ? 'btn-success' : 'btn-danger'}`} onClick={executeProcess}>Xác nhận</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-
-      {logsModalOpen && (
-        <div className="modal-overlay">
-          <div className="modal-content">
-            <h3>Lịch sử thao tác</h3>
-            <ul style={{ listStyle: 'none', padding: 0 }}>
-              {auditLogs.length === 0 ? <li>Chưa có thao tác nào.</li> : auditLogs.map(log => (
-                <li key={log.id} style={{ padding: '10px', borderBottom: '1px solid #eee', color: log.action.includes('từ chối') ? 'red' : 'green' }}>{log.action}</li>
-              ))}
-            </ul>
-            <div className="modal-footer">
-              <button className="btn btn-secondary" onClick={() => setLogsModalOpen(false)}>Đóng</button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+      </Content>
+    </Layout>
   );
 }
