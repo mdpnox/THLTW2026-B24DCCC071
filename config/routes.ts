@@ -82,7 +82,7 @@
 
 	{
     path: '/bai-1',
-    name: 'Ứng dụng lập kế hoạch du lịch',
+    name: 'Quản lý phòng học',
     icon: 'book',
     component: './Bai1',
   },
