@@ -82,7 +82,7 @@
 
 	{
     path: '/bai-1',
-    name: 'Quản lý phòng học',
+    name: 'Ứng dụng Blog cá nhân',
     icon: 'book',
     component: './Bai1',
   },
