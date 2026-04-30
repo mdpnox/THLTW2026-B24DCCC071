@@ -1,342 +1,486 @@
-import React, { useState, useEffect } from 'react';
-import ReactMarkdown from 'react-markdown';
-import './Bai1.css';
+import React, { useState, useMemo } from 'react';
+import {
+  Layout, Menu, Card, Row, Col, Statistic, Timeline, Table, Tag, Button,
+  Input, Select, DatePicker, Popconfirm, Modal, Form, Drawer, Progress, Segmented, InputNumber, Space, Typography, message
+} from 'antd';
+import {
+  DashboardOutlined, BookOutlined, HeartOutlined, TagOutlined,
+  PlaySquareOutlined, PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined
+} from '@ant-design/icons';
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
+  LineChart, Line
+} from 'recharts';
+import dayjs, { Dayjs } from 'dayjs';
+import isBetween from 'dayjs/plugin/isBetween';
 
-type TrangThaiBaiViet = 'Nhap' | 'DaDang';
+dayjs.extend(isBetween);
 
-interface Tag {
-  id: string;
-  ten: string;
-}
+const { Header, Content, Sider } = Layout;
+const { Title, Text } = Typography;
+const { RangePicker } = DatePicker;
 
-interface BaiViet {
-  id: string;
-  tieuDe: string;
-  slug: string;
-  tomTat: string;
-  noiDung: string;
-  anhDaiDien: string;
-  ngayDang: string;
-  tacGia: string;
-  danhSachTheId: string[];
-  luotXem: number;
-  trangThai: TrangThaiBaiViet;
-}
+interface Workout { id: string; date: string; type: string; duration: number; calories: number; notes: string; status: string; }
+interface HealthMetric { id: string; date: string; weight: number; height: number; heartRate: number; sleep: number; }
+interface Goal { id: string; name: string; type: string; target: number; current: number; deadline: string; status: string; }
+interface Exercise { id: string; name: string; muscle: string; difficulty: string; desc: string; calPerHour: number; }
 
-
-const duLieuTheMau: Tag[] = [
-  { id: 't1', ten: 'Ẩm thực' },
-  { id: 't2', ten: 'Du lịch' },
-  { id: 't3', ten: 'Thiên nhiên' },
-  { id: 't4', ten: 'Kỳ quan' },
+const initialWorkouts: Workout[] = [
+  { id: '1', date: '2023-10-01', type: 'Cardio', duration: 30, calories: 300, notes: 'Chạy bộ nhẹ nhàng', status: 'Hoàn thành' },
+  { id: '2', date: '2023-10-03', type: 'Strength', duration: 45, calories: 400, notes: 'Đẩy ngực, kéo xô', status: 'Hoàn thành' },
+  { id: '3', date: '2023-10-10', type: 'Yoga', duration: 60, calories: 200, notes: 'Yoga thư giãn', status: 'Hoàn thành' },
 ];
 
-const taoBaiVietMau = (): BaiViet[] => {
-  const titles = [
-    { td: 'Phở Hà Nội – hương vị truyền thống', tag: 't1', tom: 'Quy trình nấu phở chuẩn vị Bắc' },
-    { td: 'Du lịch Đà Lạt mùa hoa dã quỳ', tag: 't2', tom: 'Kinh nghiệm di chuyển, lưu trú và ăn uống' },
-    { td: 'Vẻ đẹp của rừng Cúc Phương', tag: 't3', tom: 'Khám phá hệ sinh thái đa dạng' },
-    { td: 'Kỳ quan Machu Picchu – thành phố mất tích', tag: 't4', tom: 'Bí ẩn chưa lời giải' },
-    { td: 'Bún chả Hà Nội – ngon khó cưỡng', tag: 't1', tom: 'Công thức gia truyền từ phố cổ' },
-    { td: 'Sapa – thung lũng mây ngàn', tag: 't2', tom: 'Lịch trình trekking 2 ngày' },
-    { td: 'Vịnh Hạ Long – kỳ quan thiên nhiên thế giới', tag: 't3', tom: 'Những hang động kỳ bí' },
-    { td: 'Taj Mahal – biểu tượng tình yêu', tag: 't4', tom: 'Câu chuyện đằng sau công trình' },
-    { td: 'Cơm tấm Sài Gòn', tag: 't1', tom: 'Sự khác biệt giữa các vùng miền' },
-    { td: 'Hội An – phố cổ lung linh', tag: 't2', tom: 'Top 10 món ăn đường phố' },
-  ];
-  return titles.map((item, idx) => ({
-    id: `bv${idx + 1}`,
-    tieuDe: item.td,
-    slug: item.td.toLowerCase().replace(/[^\w\s]/g, '').replace(/\s+/g, '-'),
-    tomTat: item.tom,
-    noiDung: `## ${item.td}\n\nNội dung chi tiết đang được cập nhật...\n\n**Điểm nhấn**: ...\n\n- Mục 1\n- Mục 2`,
-    anhDaiDien: `https://picsum.photos/seed/${idx + 200}/400/250`,
-    ngayDang: new Date(Date.now() - idx * 86400000).toISOString().split('T')[0],
-    tacGia: 'Nguyen Van A',  
-    danhSachTheId: [item.tag],
-    luotXem: Math.floor(Math.random() * 500),
-    trangThai: idx === 9 ? 'Nhap' : 'DaDang',
-  }));
+const initialMetrics: HealthMetric[] = [
+  { id: '1', date: '2023-10-01', weight: 70, height: 175, heartRate: 65, sleep: 7.5 },
+  { id: '2', date: '2023-10-08', weight: 69.5, height: 175, heartRate: 64, sleep: 8 },
+];
+
+const initialGoals: Goal[] = [
+  { id: '1', name: 'Giảm 5kg', type: 'Giảm cân', target: 5, current: 2, deadline: '2023-12-31', status: 'Đang thực hiện' },
+  { id: '2', name: 'Chạy 10km', type: 'Cải thiện sức bền', target: 10, current: 10, deadline: '2023-11-15', status: 'Đã đạt' },
+];
+
+const initialExercises: Exercise[] = [
+  { id: '1', name: 'Push Up', muscle: 'Chest', difficulty: 'Trung bình', desc: 'Hít đất cơ bản', calPerHour: 400 },
+  { id: '2', name: 'Squat', muscle: 'Legs', difficulty: 'Dễ', desc: 'Gập gối squat', calPerHour: 450 },
+  { id: '3', name: 'Pull Up', muscle: 'Back', difficulty: 'Khó', desc: 'Hít xà đơn', calPerHour: 500 },
+];
+
+const getBmiTag = (weight: number, height: number) => {
+  const bmi = weight / Math.pow(height / 100, 2);
+  if (bmi < 18.5) return { color: 'blue', label: 'Thiếu cân', value: bmi.toFixed(1) };
+  if (bmi < 25) return { color: 'green', label: 'Bình thường', value: bmi.toFixed(1) };
+  if (bmi < 30) return { color: 'gold', label: 'Thừa cân', value: bmi.toFixed(1) };
+  return { color: 'red', label: 'Béo phì', value: bmi.toFixed(1) };
 };
 
-const duLieuBaiVietMau = taoBaiVietMau();
+export default function FitnessApp() {
+  const [activeMenu, setActiveMenu] = useState('1');
 
-const IconTimKiem = () => (<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>);
-const IconQuayLai = () => (<svg viewBox="0 0 24 24"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>);
-const IconSua = () => (<svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>);
-const IconXoa = () => (<svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>);
-const IconThem = () => (<svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>);
-const IconMat = () => (<svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>);
+  const [workouts, setWorkouts] = useState<Workout[]>(initialWorkouts);
+  const [metrics, setMetrics] = useState<HealthMetric[]>(initialMetrics);
+  const [goals, setGoals] = useState<Goal[]>(initialGoals);
+  const [exercises, setExercises] = useState<Exercise[]>(initialExercises);
 
-export default function UngDungBlog() {
-  const [trangHienTai, setTrangHienTai] = useState<'trang-chu' | 'chi-tiet' | 'gioi-thieu' | 'quan-ly-bai-viet' | 'quan-ly-the'>('trang-chu');
-  const [danhSachBaiViet, setDanhSachBaiViet] = useState<BaiViet[]>(duLieuBaiVietMau);
-  const [danhSachThe, setDanhSachThe] = useState<Tag[]>(duLieuTheMau);
-  const [tuKhoaTimKiem, setTuKhoaTimKiem] = useState('');
-  const [tuKhoaDebounced, setTuKhoaDebounced] = useState('');
-  const [theDuocChon, setTheDuocChon] = useState<string | null>(null);
-  const [trangSo, setTrangSo] = useState(1);
-  const [idBaiVietDangXem, setIdBaiVietDangXem] = useState<string | null>(null);
-  const [tuKhoaQuanLyBV, setTuKhoaQuanLyBV] = useState('');
-  const [locTrangThaiBV, setLocTrangThaiBV] = useState<TrangThaiBaiViet | 'TatCa'>('TatCa');
-  const [baiVietDangSua, setBaiVietDangSua] = useState<BaiViet | null>(null);
-  const [theDangSua, setTheDangSua] = useState<Tag | null>(null);
+  const DashboardView = () => {
+    const totalWorkoutsThisMonth = workouts.filter(w => dayjs(w.date).month() === dayjs().month()).length;
+    const totalCalories = workouts.reduce((sum, w) => sum + w.calories, 0);
 
-  useEffect(() => {
-    const timer = setTimeout(() => { setTuKhoaDebounced(tuKhoaTimKiem); setTrangSo(1); }, 300);
-    return () => clearTimeout(timer);
-  }, [tuKhoaTimKiem]);
-
-  useEffect(() => {
-    if (trangHienTai === 'chi-tiet' && idBaiVietDangXem) {
-      setDanhSachBaiViet(prev => prev.map(bv => bv.id === idBaiVietDangXem ? { ...bv, luotXem: bv.luotXem + 1 } : bv));
+    const workoutDates = workouts.map(w => dayjs(w.date).format('YYYY-MM-DD')).sort();
+    let streak = 0;
+    for (let i = workoutDates.length - 1; i >= 0; i--) {
+      const expectedDate = dayjs().subtract(streak, 'day').format('YYYY-MM-DD');
+      if (workoutDates[i] === expectedDate) streak++;
+      else break;
     }
-  }, [trangHienTai, idBaiVietDangXem]);
+    const completedGoals = goals.filter(g => g.status === 'Đã đạt').length;
+    const goalPercent = goals.length ? Math.round((completedGoals / goals.length) * 100) : 0;
 
-  const layTenTheTuId = (ids: string[]) => danhSachThe.filter(t => ids.includes(t.id));
-  const chuyenTrang = (trang: typeof trangHienTai) => { setTrangHienTai(trang); window.scrollTo(0, 0); };
 
-  const renderTrangChu = () => {
-    let baiVietDaLoc = danhSachBaiViet.filter(bv => bv.trangThai === 'DaDang');
-    if (theDuocChon) baiVietDaLoc = baiVietDaLoc.filter(bv => bv.danhSachTheId.includes(theDuocChon));
-    if (tuKhoaDebounced) {
-      const kw = tuKhoaDebounced.toLowerCase();
-      baiVietDaLoc = baiVietDaLoc.filter(bv => bv.tieuDe.toLowerCase().includes(kw) || bv.tomTat.toLowerCase().includes(kw));
-    }
-    const pageSize = 9;
-    const total = Math.ceil(baiVietDaLoc.length / pageSize);
-    const visible = baiVietDaLoc.slice((trangSo - 1) * pageSize, trangSo * pageSize);
+    const weeks = Array.from({ length: 4 }, (_, i) => {
+      const start = dayjs().subtract(3 - i, 'week').startOf('week');
+      const end = start.endOf('week');
+      const count = workouts.filter(w => dayjs(w.date).isBetween(start, end, null, '[]')).length;
+      return { name: `Tuần ${i+1}`, workouts: count };
+    });
+
+    const lineData = [...metrics].sort((a,b) => dayjs(a.date).valueOf() - dayjs(b.date).valueOf()).map(m => ({ date: m.date, weight: m.weight }));
+
+    return (
+      <Space direction="vertical" size="large" style={{ width: '100%' }}>
+        <Row gutter={16}>
+          <Col span={6}><Card><Statistic title="Tổng buổi tập (Tháng)" value={totalWorkoutsThisMonth} /></Card></Col>
+          <Col span={6}><Card><Statistic title="Tổng calo đã đốt" value={totalCalories} suffix="kcal" /></Card></Col>
+          <Col span={6}><Card><Statistic title="Số ngày tập liên tiếp (Streak)" value={streak} /></Card></Col>
+          <Col span={6}><Card><Statistic title="Mục tiêu hoàn thành" value={goalPercent} suffix="%" /></Card></Col>
+        </Row>
+        <Row gutter={16}>
+          <Col span={10}>
+            <Card title="Số buổi tập theo tuần">
+              <ResponsiveContainer width="100%" height={250}>
+                <BarChart data={weeks}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="name" /><YAxis /><RechartsTooltip /><Bar dataKey="workouts" fill="#1890ff" /></BarChart>
+              </ResponsiveContainer>
+            </Card>
+          </Col>
+          <Col span={10}>
+            <Card title="Thay đổi cân nặng">
+              <ResponsiveContainer width="100%" height={250}>
+                <LineChart data={lineData}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="date" /><YAxis domain={['auto', 'auto']} /><RechartsTooltip /><Line type="monotone" dataKey="weight" stroke="#52c41a" /></LineChart>
+              </ResponsiveContainer>
+            </Card>
+          </Col>
+          <Col span={4}>
+            <Card title="5 buổi gần nhất">
+              <Timeline>
+                {workouts.slice(-5).reverse().map(w => (
+                  <Timeline.Item key={w.id}>{`${w.date}: ${w.type} (${w.duration}m)`}</Timeline.Item>
+                ))}
+              </Timeline>
+            </Card>
+          </Col>
+        </Row>
+      </Space>
+    );
+  };
+
+  const WorkoutLogView = () => {
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [form] = Form.useForm();
+    const [editingId, setEditingId] = useState<string | null>(null);
+    const [searchText, setSearchText] = useState('');
+    const [filterType, setFilterType] = useState<string | null>(null);
+    const [dateRange, setDateRange] = useState<[Dayjs | null, Dayjs | null] | null>(null);
+
+    const filteredWorkouts = useMemo(() => {
+      let data = [...workouts];
+      if (searchText) {
+        data = data.filter(w => w.type.toLowerCase().includes(searchText.toLowerCase()) || w.notes?.toLowerCase().includes(searchText.toLowerCase()));
+      }
+      if (filterType) {
+        data = data.filter(w => w.type === filterType);
+      }
+      if (dateRange && dateRange[0] && dateRange[1]) {
+        data = data.filter(w => dayjs(w.date).isBetween(dateRange[0], dateRange[1], null, '[]'));
+      }
+      return data;
+    }, [workouts, searchText, filterType, dateRange]);
+
+    const columns = [
+      { title: 'Ngày', dataIndex: 'date' },
+      { title: 'Loại bài tập', dataIndex: 'type' },
+      { title: 'Thời lượng (p)', dataIndex: 'duration' },
+      { title: 'Calo đốt', dataIndex: 'calories' },
+      { title: 'Ghi chú', dataIndex: 'notes' },
+      { title: 'Trạng thái', dataIndex: 'status', render: (s: string) => <Tag color={s === 'Hoàn thành' ? 'green' : 'red'}>{s}</Tag> },
+      {
+        title: 'Hành động', render: (_: any, record: Workout) => (
+          <Space>
+            <Button icon={<EditOutlined />} onClick={() => { setEditingId(record.id); form.setFieldsValue({ ...record, date: dayjs(record.date) }); setIsModalOpen(true); }} />
+            <Popconfirm title="Xóa buổi tập?" onConfirm={() => setWorkouts(workouts.filter(w => w.id !== record.id))}><Button danger icon={<DeleteOutlined />} /></Popconfirm>
+          </Space>
+        )
+      }
+    ];
+
+    const handleSave = (values: any) => {
+      const newWorkout = { ...values, id: editingId || Date.now().toString(), date: values.date.format('YYYY-MM-DD'), calories: values.calories || 0 };
+      if (editingId) setWorkouts(workouts.map(w => w.id === editingId ? newWorkout : w));
+      else setWorkouts([...workouts, newWorkout]);
+      setIsModalOpen(false); form.resetFields(); setEditingId(null);
+      message.success(editingId ? 'Cập nhật thành công' : 'Thêm buổi tập thành công');
+    };
+
     return (
       <div>
-        <div style={{ display: 'flex', gap: 15, marginBottom: 20 }}>
-          <div style={{ position: 'relative', flex: 1 }}>
-            <span style={{ position: 'absolute', top: 10, left: 10, color: 'var(--mau-chu-nhat)' }}><IconTimKiem /></span>
-            <input type="text" className="o-nhap" style={{ paddingLeft: 35, marginBottom: 0 }} placeholder="Tìm kiếm bài viết..." value={tuKhoaTimKiem} onChange={e => setTuKhoaTimKiem(e.target.value)} />
-          </div>
-          <div className="danh-sach-tag" style={{ margin: 0, alignItems: 'center' }}>
-            <span className={`tag ${theDuocChon === null ? 'dang-chon' : ''}`} onClick={() => { setTheDuocChon(null); setTrangSo(1); }}>Tất cả</span>
-            {danhSachThe.map(t => <span key={t.id} className={`tag ${theDuocChon === t.id ? 'dang-chon' : ''}`} onClick={() => { setTheDuocChon(t.id); setTrangSo(1); }}>{t.ten}</span>)}
-          </div>
-        </div>
-        <div className="luoi-bai-viet">
-          {visible.map(bv => (
-            <div key={bv.id} className="the-bai-viet" onClick={() => { setIdBaiVietDangXem(bv.id); chuyenTrang('chi-tiet'); }}>
-              <img src={bv.anhDaiDien} alt={bv.tieuDe} />
-              <div className="noi-dung">
-                <div className="danh-sach-tag">{layTenTheTuId(bv.danhSachTheId).map(t => <span key={t.id} className="tag">{t.ten}</span>)}</div>
-                <h3>{bv.tieuDe}</h3>
-                <p>{bv.tomTat}</p>
-                <div className="thong-tin-phu"><span>{bv.tacGia}</span><span>{bv.ngayDang}</span></div>
-              </div>
-            </div>
-          ))}
-          {visible.length === 0 && <p>Không có bài viết.</p>}
-        </div>
-        {total > 1 && <div className="phan-trang">{Array.from({ length: total }).map((_, i) => <button key={i} className={trangSo === i + 1 ? 'hien-tai' : ''} onClick={() => setTrangSo(i + 1)}>{i + 1}</button>)}</div>}
+        <Space style={{ marginBottom: 16 }} wrap>
+          <Input placeholder="Tìm theo loại hoặc ghi chú" prefix={<SearchOutlined />} value={searchText} onChange={e => setSearchText(e.target.value)} style={{ width: 200 }} />
+          <Select placeholder="Loại bài tập" allowClear style={{ width: 150 }} options={['Cardio', 'Strength', 'Yoga', 'HIIT', 'Other'].map(v => ({ value: v, label: v }))} value={filterType} onChange={setFilterType} />
+          <RangePicker onChange={(dates) => setDateRange(dates as [Dayjs | null, Dayjs | null] | null)} />
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => { form.resetFields(); setEditingId(null); setIsModalOpen(true); }}>Thêm buổi tập</Button>
+        </Space>
+        <Table dataSource={filteredWorkouts} columns={columns} rowKey="id" />
+        <Modal title={editingId ? "Sửa buổi tập" : "Thêm buổi tập"} open={isModalOpen} onCancel={() => setIsModalOpen(false)} onOk={() => form.submit()}>
+          <Form form={form} onFinish={handleSave} layout="vertical">
+            <Form.Item name="date" label="Ngày tập" rules={[{ required: true }]}><DatePicker style={{ width: '100%' }} /></Form.Item>
+            <Form.Item name="type" label="Loại bài tập" rules={[{ required: true }]}><Select options={['Cardio', 'Strength', 'Yoga', 'HIIT', 'Other'].map(v => ({ value: v, label: v }))} /></Form.Item>
+            <Row gutter={16}>
+              <Col span={12}><Form.Item name="duration" label="Thời lượng (phút)" rules={[{ required: true }]}><InputNumber style={{ width: '100%' }} min={1} /></Form.Item></Col>
+              <Col span={12}><Form.Item name="calories" label="Calo đốt"><InputNumber style={{ width: '100%' }} min={0} /></Form.Item></Col>
+            </Row>
+            <Form.Item name="status" label="Trạng thái"><Select options={[{ value: 'Hoàn thành', label: 'Hoàn thành' }, { value: 'Bỏ lỡ', label: 'Bỏ lỡ' }]} /></Form.Item>
+            <Form.Item name="notes" label="Ghi chú"><Input.TextArea /></Form.Item>
+          </Form>
+        </Modal>
       </div>
     );
   };
 
-const renderChiTiet = () => {
-  const baiViet = danhSachBaiViet.find((bv) => bv.id === idBaiVietDangXem);
-  if (!baiViet) return <div>Không tìm thấy bài viết.</div>;
+  const HealthMetricsView = () => {
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [form] = Form.useForm();
+    const [editingId, setEditingId] = useState<string | null>(null);
 
-  const baiVietLienQuan = danhSachBaiViet
-    .filter(
-      (bv) =>
-        bv.id !== baiViet.id &&
-        bv.trangThai === 'DaDang' &&
-        bv.danhSachTheId.some((id) => baiViet.danhSachTheId.includes(id))
-    )
-    .slice(0, 3);
+    const columns = [
+      { title: 'Ngày', dataIndex: 'date' },
+      { title: 'Cân nặng (kg)', dataIndex: 'weight' },
+      { title: 'Chiều cao (cm)', dataIndex: 'height' },
+      {
+        title: 'BMI', render: (_: any, record: HealthMetric) => {
+          const { color, value, label } = getBmiTag(record.weight, record.height);
+          return <Tag color={color}>{value} ({label})</Tag>;
+        }
+      },
+      { title: 'Nhịp tim (bpm)', dataIndex: 'heartRate' },
+      { title: 'Giờ ngủ', dataIndex: 'sleep' },
+      {
+        title: 'Hành động', render: (_: any, record: HealthMetric) => (
+          <Space>
+            <Button icon={<EditOutlined />} onClick={() => { setEditingId(record.id); form.setFieldsValue({ ...record, date: dayjs(record.date) }); setIsModalOpen(true); }} />
+            <Popconfirm title="Xóa chỉ số?" onConfirm={() => setMetrics(metrics.filter(m => m.id !== record.id))}><Button danger icon={<DeleteOutlined />} /></Popconfirm>
+          </Space>
+        )
+      }
+    ];
 
-  return (
-    <div className="khung-chua">
-      <button
-        className="nut-bam phu"
-        style={{ marginBottom: '20px' }}
-        onClick={() => chuyenTrang('trang-chu')}
-      >
-        <IconQuayLai /> Quay lại danh sách
-      </button>
-      <img
-        src={baiViet.anhDaiDien}
-        alt="Ảnh đại diện"
-        style={{
-          width: '100%',
-          height: '400px',
-          objectFit: 'cover',
-          borderRadius: '8px',
-          marginBottom: '20px',
-        }}
-      />
-      <h1 className="tieu-de-chinh">{baiViet.tieuDe}</h1>
-
-      <div
-        style={{
-          display: 'flex',
-          gap: '20px',
-          color: 'var(--mau-chu-nhat)',
-          marginBottom: '20px',
-          borderBottom: '1px solid var(--mau-vien)',
-          paddingBottom: '20px',
-        }}
-      >
-        <span>
-          Tác giả: <b>{baiViet.tacGia}</b>
-        </span>
-        <span>Ngày đăng: {baiViet.ngayDang}</span>
-        <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-          <IconMat /> {baiViet.luotXem} lượt xem
-        </span>
-      </div>
-
-      <div className="danh-sach-tag">
-        {layTenTheTuId(baiViet.danhSachTheId).map((t) => (
-          <span key={t.id} className="tag">
-            {t.ten}
-          </span>
-        ))}
-      </div>
-
-      <div className="noi-dung-markdown" style={{ marginTop: '20px', lineHeight: 1.8 }}>
-        <ReactMarkdown>{baiViet.noiDung}</ReactMarkdown>
-      </div>
-
-      {baiVietLienQuan.length > 0 && (
-        <div
-          style={{
-            marginTop: '50px',
-            paddingTop: '20px',
-            borderTop: '1px solid var(--mau-vien)',
-          }}
-        >
-          <h3>Bài viết liên quan</h3>
-          <div className="luoi-bai-viet" style={{ marginTop: '15px' }}>
-            {baiVietLienQuan.map((bv) => (
-              <div
-                key={bv.id}
-                className="the-bai-viet"
-                onClick={() => setIdBaiVietDangXem(bv.id)}
-              >
-                <img src={bv.anhDaiDien} alt={bv.tieuDe} style={{ height: '120px' }} />
-                <div className="noi-dung">
-                  <h3 style={{ fontSize: '16px' }}>{bv.tieuDe}</h3>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
-
-  const renderGioiThieu = () => (
-    <div className="khung-chua" style={{ textAlign: 'center', maxWidth: 600, margin: '0 auto' }}>
-      <img src="https://www.vietnamworks.com/hrinsider/wp-content/uploads/2023/12/anh-den-ngau-005.jpg" alt="Avatar" style={{ borderRadius: '50%', width: 150, height: 150, marginBottom: 20 }} />
-      <h2>Nguyen Van A</h2>
-      <p style={{ color: 'var(--mau-chu-nhat)', marginBottom: 20 }}>Đam mê ẩm thực & du lịch | Blog chia sẻ trải nghiệm thực tế</p>
-      <p>Xin chào! Tôi thích xê dịch, thưởng thức món ngon và khám phá kỳ quan thiên nhiên. Hy vọng truyền cảm hứng cho bạn!</p>
-      <div style={{ marginTop: 20, display: 'flex', justifyContent: 'center', gap: 10 }}>
-        {danhSachThe.map(t => <span key={t.id} className="tag">{t.ten}</span>)}
-      </div>
-      <div style={{ marginTop: 30, display: 'flex', justifyContent: 'center', gap: 20 }}>
-        <a href="https://www.facebook.com" style={{ color: 'var(--mau-chu-dao)' }}>Facebook</a>
-        <a href="https://www.youtube.com" style={{ color: 'var(--mau-chu-dao)' }}>YouTube</a>
-      </div>
-    </div>
-  );
-
-  const renderQuanLyBaiViet = () => {
-    if (baiVietDangSua) {
-      const handleSave = (e: React.FormEvent<HTMLFormElement>) => {
-        e.preventDefault();
-        const form = new FormData(e.currentTarget);
-        const updated: BaiViet = {
-          ...baiVietDangSua,
-          id: baiVietDangSua.id || `bv_${Date.now()}`,
-          tieuDe: form.get('tieuDe') as string,
-          slug: form.get('slug') as string,
-          tomTat: form.get('tomTat') as string,
-          noiDung: form.get('noiDung') as string,
-          anhDaiDien: form.get('anhDaiDien') as string,
-          trangThai: form.get('trangThai') as TrangThaiBaiViet,
-          tacGia: 'Nguyen Van A',
-          ngayDang: baiVietDangSua.ngayDang || new Date().toISOString().split('T')[0],
-          luotXem: baiVietDangSua.luotXem || 0,
-          danhSachTheId: form.getAll('danhSachTheId') as string[],
-        };
-        if (baiVietDangSua.id) setDanhSachBaiViet(prev => prev.map(b => b.id === updated.id ? updated : b));
-        else setDanhSachBaiViet([updated, ...danhSachBaiViet]);
-        setBaiVietDangSua(null);
-      };
-      return (
-        <div className="khung-chua">
-          <h2>{baiVietDangSua.id ? 'Sửa bài viết' : 'Thêm bài viết mới'}</h2>
-          <form onSubmit={handleSave}>
-            {['tieuDe', 'slug', 'anhDaiDien', 'tomTat', 'noiDung'].map(field => (
-              <div key={field} className="nhom-form">
-                <label>{field === 'anhDaiDien' ? 'Ảnh URL' : field === 'tomTat' ? 'Tóm tắt' : field === 'noiDung' ? 'Nội dung' : field}</label>
-                {field === 'tomTat' ? <textarea name={field} className="o-nhap" defaultValue={baiVietDangSua[field as keyof BaiViet] as string} required style={{ minHeight: 60 }} />
-                 : field === 'noiDung' ? <textarea name={field} className="o-nhap" defaultValue={baiVietDangSua[field as keyof BaiViet] as string} required style={{ minHeight: 150 }} />
-                 : <input name={field} className="o-nhap" defaultValue={baiVietDangSua[field as keyof BaiViet] as string} required />}
-              </div>
-            ))}
-            <div className="nhom-form"><label>Trạng thái</label><select name="trangThai" className="o-nhap" defaultValue={baiVietDangSua.trangThai}><option value="DaDang">Đã đăng</option><option value="Nhap">Nháp</option></select></div>
-            <div className="nhom-form"><label>Thẻ (Ctrl+Click)</label><select name="danhSachTheId" multiple className="o-nhap" style={{ height: 100 }} defaultValue={baiVietDangSua.danhSachTheId}>{danhSachThe.map(t => <option key={t.id} value={t.id}>{t.ten}</option>)}</select></div>
-            <div className="hanh-dong"><button type="submit" className="nut-bam">Lưu</button><button type="button" className="nut-bam phu" onClick={() => setBaiVietDangSua(null)}>Hủy</button></div>
-          </form>
-        </div>
-      );
-    }
-    const filtered = danhSachBaiViet.filter(bv => (locTrangThaiBV === 'TatCa' || bv.trangThai === locTrangThaiBV) && bv.tieuDe.toLowerCase().includes(tuKhoaQuanLyBV.toLowerCase()));
-    return (
-      <div className="khung-chua">
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 20 }}><h2 className="tieu-de-chinh">Quản lý bài viết</h2><button className="nut-bam" onClick={() => setBaiVietDangSua({ id: '', tieuDe: '', slug: '', tomTat: '', noiDung: '', anhDaiDien: '', ngayDang: '', tacGia: 'Lê Khám Phá', danhSachTheId: [], luotXem: 0, trangThai: 'Nhap' })}><IconThem /> Thêm mới</button></div>
-        <div style={{ display: 'flex', gap: 15, marginBottom: 20 }}><input className="o-nhap" style={{ flex: 2, marginBottom: 0 }} placeholder="Tìm tiêu đề..." value={tuKhoaQuanLyBV} onChange={e => setTuKhoaQuanLyBV(e.target.value)} /><select className="o-nhap" style={{ flex: 1, marginBottom: 0 }} value={locTrangThaiBV} onChange={e => setLocTrangThaiBV(e.target.value as any)}><option value="TatCa">Tất cả</option><option value="DaDang">Đã đăng</option><option value="Nhap">Nháp</option></select></div>
-        <div style={{ overflowX: 'auto' }}>
-          <table className="bang-quan-ly"><thead><tr><th>Tiêu đề</th><th>Trạng thái</th><th>Thẻ</th><th>Lượt xem</th><th>Ngày tạo</th><th>Thao tác</th></tr></thead><tbody>{filtered.map(bv => (<tr key={bv.id}><td>{bv.tieuDe}</td><td><span className={`tag ${bv.trangThai === 'DaDang' ? 'dang-chon' : ''}`}>{bv.trangThai === 'DaDang' ? 'Đã đăng' : 'Nháp'}</span></td><td>{layTenTheTuId(bv.danhSachTheId).map(t => t.ten).join(', ')}</td><td>{bv.luotXem}</td><td>{bv.ngayDang}</td><td><div className="hanh-dong"><button className="nut-bam phu" style={{ padding: 6 }} onClick={() => setBaiVietDangSua(bv)}><IconSua /></button><button className="nut-bam nguy-hiem" style={{ padding: 6 }} onClick={() => { if (window.confirm('Xóa?')) setDanhSachBaiViet(prev => prev.filter(b => b.id !== bv.id)); }}><IconXoa /></button></div></td></tr>))}</tbody></table>
-        </div>
-      </div>
-    );
-  };
-
-
-  const renderQuanLyThe = () => {
-    const handleSaveTag = (e: React.FormEvent<HTMLFormElement>) => {
-      e.preventDefault();
-      const name = (new FormData(e.currentTarget).get('tenThe') as string).trim();
-      if (!name) return;
-      if (theDangSua) setDanhSachThe(prev => prev.map(t => t.id === theDangSua.id ? { ...t, ten: name } : t));
-      else setDanhSachThe([...danhSachThe, { id: `t_${Date.now()}`, ten: name }]);
-      setTheDangSua(null);
+    const handleSave = (values: any) => {
+      const newMetric = { ...values, id: editingId || Date.now().toString(), date: values.date.format('YYYY-MM-DD') };
+      if (editingId) setMetrics(metrics.map(m => m.id === editingId ? newMetric : m));
+      else setMetrics([...metrics, newMetric]);
+      setIsModalOpen(false); form.resetFields(); setEditingId(null);
+      message.success(editingId ? 'Cập nhật thành công' : 'Thêm chỉ số thành công');
     };
+
     return (
-      <div className="khung-chua">
-        <h2 className="tieu-de-chinh">Quản lý thẻ</h2>
-        <form onSubmit={handleSaveTag} style={{ display: 'flex', gap: 10, marginBottom: 20 }}><input name="tenThe" className="o-nhap" style={{ marginBottom: 0, flex: 1 }} placeholder="Tên thẻ mới..." defaultValue={theDangSua?.ten || ''} required /><button type="submit" className="nut-bam">{theDangSua ? 'Cập nhật' : 'Thêm'}</button>{theDangSua && <button type="button" className="nut-bam phu" onClick={() => setTheDangSua(null)}>Hủy</button>}</form>
-        <table className="bang-quan-ly"><thead><tr><th>Tên thẻ</th><th>Số bài viết</th><th>Thao tác</th></tr></thead><tbody>{danhSachThe.map(t => (<tr key={t.id}><td><b>{t.ten}</b></td><td>{danhSachBaiViet.filter(bv => bv.danhSachTheId.includes(t.id)).length}</td><td><div className="hanh-dong"><button className="nut-bam phu" style={{ padding: 6 }} onClick={() => setTheDangSua(t)}><IconSua /></button><button className="nut-bam nguy-hiem" style={{ padding: 6 }} onClick={() => { if (window.confirm('Xóa thẻ?')) { setDanhSachThe(prev => prev.filter(x => x.id !== t.id)); setDanhSachBaiViet(prev => prev.map(bv => ({ ...bv, danhSachTheId: bv.danhSachTheId.filter(id => id !== t.id) }))); } }}><IconXoa /></button></div></td></tr>))}</tbody></table>
+      <div>
+        <Button type="primary" icon={<PlusOutlined />} style={{ marginBottom: 16 }} onClick={() => { form.resetFields(); setEditingId(null); setIsModalOpen(true); }}>Thêm chỉ số</Button>
+        <Table dataSource={metrics} columns={columns} rowKey="id" />
+        <Modal title={editingId ? "Sửa chỉ số" : "Thêm chỉ số"} open={isModalOpen} onCancel={() => setIsModalOpen(false)} onOk={() => form.submit()}>
+          <Form form={form} onFinish={handleSave} layout="vertical">
+            <Form.Item name="date" label="Ngày" rules={[{ required: true }]}><DatePicker style={{ width: '100%' }} /></Form.Item>
+            <Row gutter={16}>
+              <Col span={12}><Form.Item name="weight" label="Cân nặng (kg)" rules={[{ required: true }]}><InputNumber style={{ width: '100%' }} min={0} step={0.1} /></Form.Item></Col>
+              <Col span={12}><Form.Item name="height" label="Chiều cao (cm)" rules={[{ required: true }]}><InputNumber style={{ width: '100%' }} min={50} max={300} /></Form.Item></Col>
+            </Row>
+            <Row gutter={16}>
+              <Col span={12}><Form.Item name="heartRate" label="Nhịp tim (bpm)"><InputNumber style={{ width: '100%' }} min={30} max={200} /></Form.Item></Col>
+              <Col span={12}><Form.Item name="sleep" label="Giờ ngủ"><InputNumber style={{ width: '100%' }} min={0} max={24} step={0.5} /></Form.Item></Col>
+            </Row>
+          </Form>
+        </Modal>
+      </div>
+    );
+  };
+
+  const GoalManagementView = () => {
+    const [statusFilter, setStatusFilter] = useState('Tất cả');
+    const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+    const [goalForm] = Form.useForm();
+
+    const filteredGoals = statusFilter === 'Tất cả' ? goals : goals.filter(g => g.status === statusFilter);
+
+    const updateCurrent = (id: string, val: number | null) => {
+      if (val !== null) setGoals(goals.map(g => g.id === id ? { ...g, current: val } : g));
+    };
+
+    const handleAddGoal = (values: any) => {
+      const newGoal: Goal = {
+        id: Date.now().toString(),
+        name: values.name,
+        type: values.type,
+        target: values.target,
+        current: 0,
+        deadline: values.deadline.format('YYYY-MM-DD'),
+        status: 'Đang thực hiện',
+      };
+      setGoals([...goals, newGoal]);
+      setIsDrawerOpen(false);
+      goalForm.resetFields();
+      message.success('Thêm mục tiêu thành công');
+    };
+
+    return (
+      <div>
+        <Space style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between' }}>
+          <Segmented options={['Tất cả', 'Đang thực hiện', 'Đã đạt', 'Đã hủy']} value={statusFilter} onChange={setStatusFilter as any} />
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => setIsDrawerOpen(true)}>Thêm mục tiêu</Button>
+        </Space>
+
+        <Row gutter={[16, 16]}>
+          {filteredGoals.map(goal => (
+            <Col span={8} key={goal.id}>
+              <Card
+                title={goal.name}
+                extra={<Tag color={goal.status === 'Đã đạt' ? 'green' : 'blue'}>{goal.status}</Tag>}
+                actions={[
+                  <Popconfirm title="Xóa mục tiêu?" onConfirm={() => setGoals(goals.filter(g => g.id !== goal.id))}><DeleteOutlined key="delete" style={{ color: 'red' }} /></Popconfirm>
+                ]}
+              >
+                <p><strong>Loại:</strong> {goal.type}</p>
+                <p><strong>Deadline:</strong> {goal.deadline}</p>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+                  <strong>Hiện tại:</strong>
+                  <InputNumber value={goal.current} onChange={(val) => updateCurrent(goal.id, val)} size="small" />
+                  / {goal.target}
+                </div>
+                <Progress percent={Math.round((goal.current / goal.target) * 100)} status={goal.current >= goal.target ? 'success' : 'active'} />
+              </Card>
+            </Col>
+          ))}
+        </Row>
+
+        <Drawer title="Thêm mục tiêu mới" placement="right" onClose={() => setIsDrawerOpen(false)} open={isDrawerOpen} width={400}>
+          <Form form={goalForm} layout="vertical" onFinish={handleAddGoal}>
+            <Form.Item name="name" label="Tên mục tiêu" rules={[{ required: true }]}><Input /></Form.Item>
+            <Form.Item name="type" label="Loại" rules={[{ required: true }]}><Select options={['Giảm cân', 'Tăng cơ', 'Cải thiện sức bền', 'Khác'].map(v => ({ value: v, label: v }))} /></Form.Item>
+            <Form.Item name="target" label="Giá trị mục tiêu" rules={[{ required: true }]}><InputNumber style={{ width: '100%' }} min={1} /></Form.Item>
+            <Form.Item name="deadline" label="Deadline" rules={[{ required: true }]}><DatePicker style={{ width: '100%' }} /></Form.Item>
+            <Form.Item><Button type="primary" htmlType="submit" block>Lưu mục tiêu</Button></Form.Item>
+          </Form>
+        </Drawer>
+      </div>
+    );
+  };
+
+  const ExerciseLibraryView = () => {
+    const [searchTxt, setSearchTxt] = useState('');
+    const [muscleFilter, setMuscleFilter] = useState<string | null>(null);
+    const [difficultyFilter, setDifficultyFilter] = useState<string | null>(null);
+    const [selectedExercise, setSelectedExercise] = useState<Exercise | null>(null);
+    const [isModalOpen, setIsModalOpen] = useState(false);     
+    const [isEditModalOpen, setIsEditModalOpen] = useState(false); 
+    const [editingExercise, setEditingExercise] = useState<Exercise | null>(null);
+    const [exerciseForm] = Form.useForm();
+    const [editForm] = Form.useForm();
+
+    const filteredExercises = useMemo(() => {
+      let data = [...exercises];
+      if (searchTxt) data = data.filter(e => e.name.toLowerCase().includes(searchTxt.toLowerCase()));
+      if (muscleFilter) data = data.filter(e => e.muscle === muscleFilter);
+      if (difficultyFilter) data = data.filter(e => e.difficulty === difficultyFilter); // Logic lọc độ khó mới thêm
+      return data;
+    }, [exercises, searchTxt, muscleFilter, difficultyFilter]);
+
+    const handleAddExercise = (values: any) => {
+      const newExercise: Exercise = {
+        id: Date.now().toString(),
+        ...values,
+      };
+      setExercises([...exercises, newExercise]);
+      setIsModalOpen(false);
+      exerciseForm.resetFields();
+      message.success('Thêm bài tập thành công');
+    };
+
+    const handleEditExercise = (exercise: Exercise) => {
+      setEditingExercise(exercise);
+      editForm.setFieldsValue(exercise);
+      setIsEditModalOpen(true);
+    };
+
+    const handleUpdateExercise = (values: any) => {
+      if (!editingExercise) return;
+      const updatedExercise = { ...editingExercise, ...values };
+      setExercises(exercises.map(ex => ex.id === editingExercise.id ? updatedExercise : ex));
+      setIsEditModalOpen(false);
+      setEditingExercise(null);
+      editForm.resetFields();
+      message.success('Cập nhật bài tập thành công');
+    };
+
+    const handleDeleteExercise = (id: string) => {
+      setExercises(exercises.filter(ex => ex.id !== id));
+      message.success('Xóa bài tập thành công');
+    };
+
+    return (
+      <div>
+        <Space style={{ marginBottom: 16 }} wrap>
+          <Input placeholder="Tìm tên bài tập..." prefix={<SearchOutlined />} onChange={e => setSearchTxt(e.target.value)} style={{ width: 200 }} />
+          <Select placeholder="Nhóm cơ" allowClear style={{ width: 150 }} options={['Chest', 'Back', 'Legs', 'Shoulders', 'Arms', 'Core', 'Full Body'].map(v => ({ value: v, label: v }))} onChange={setMuscleFilter} />
+
+          <Select placeholder="Độ khó" allowClear style={{ width: 120 }} options={['Dễ', 'Trung bình', 'Khó'].map(v => ({ value: v, label: v }))} onChange={setDifficultyFilter} />
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => setIsModalOpen(true)}>Thêm bài tập</Button>
+        </Space>
+
+        <Row gutter={[16, 16]}>
+          {filteredExercises.map(ex => (
+            <Col span={8} key={ex.id}>
+              <Card
+                hoverable
+                onClick={() => setSelectedExercise(ex)}
+                title={ex.name}
+                extra={
+                  <Space>
+                    <Tag color={ex.difficulty === 'Dễ' ? 'green' : ex.difficulty === 'Khó' ? 'red' : 'orange'}>{ex.difficulty}</Tag>
+                    <Button 
+                      type="text" 
+                      icon={<EditOutlined />} 
+                      onClick={(e) => { e.stopPropagation(); handleEditExercise(ex); }} 
+                    />
+                    <Popconfirm 
+                      title="Xóa bài tập này?" 
+                      onConfirm={(e) => { e?.stopPropagation(); handleDeleteExercise(ex.id); }}
+                      onCancel={(e) => e?.stopPropagation()}
+                    >
+                      <Button type="text" danger icon={<DeleteOutlined />} onClick={(e) => e.stopPropagation()} />
+                    </Popconfirm>
+                  </Space>
+                }
+              >
+                <p><strong>Nhóm cơ:</strong> {ex.muscle}</p>
+                <p><strong>Mô tả:</strong> {ex.desc}</p>
+                <p><strong>Calo TB/giờ:</strong> {ex.calPerHour} kcal</p>
+              </Card>
+            </Col>
+          ))}
+        </Row>
+
+        <Modal title={selectedExercise?.name} open={!!selectedExercise} onCancel={() => setSelectedExercise(null)} footer={null}>
+          {selectedExercise && (
+            <div>
+              <p><strong>Nhóm cơ tác động:</strong> <Tag>{selectedExercise.muscle}</Tag></p>
+              <p><strong>Độ khó:</strong> {selectedExercise.difficulty}</p>
+              <p><strong>Calo đốt trung bình:</strong> {selectedExercise.calPerHour} kcal/giờ</p>
+              <p><strong>Hướng dẫn chi tiết:</strong> Đây là hướng dẫn thực hiện bài tập {selectedExercise.name}. Bạn nên khởi động kỹ trước khi tập và thực hiện đúng tư thế để tránh chấn thương.</p>
+            </div>
+          )}
+        </Modal>
+
+        <Modal title="Thêm bài tập mới" open={isModalOpen} onCancel={() => setIsModalOpen(false)} onOk={() => exerciseForm.submit()}>
+          <Form form={exerciseForm} layout="vertical" onFinish={handleAddExercise}>
+            <Form.Item name="name" label="Tên bài tập" rules={[{ required: true }]}><Input /></Form.Item>
+            <Form.Item name="muscle" label="Nhóm cơ tác động" rules={[{ required: true }]}><Select options={['Chest', 'Back', 'Legs', 'Shoulders', 'Arms', 'Core', 'Full Body'].map(v => ({ value: v, label: v }))} /></Form.Item>
+            <Form.Item name="difficulty" label="Mức độ khó" rules={[{ required: true }]}><Select options={['Dễ', 'Trung bình', 'Khó'].map(v => ({ value: v, label: v }))} /></Form.Item>
+            <Form.Item name="desc" label="Mô tả ngắn"><Input.TextArea rows={3} /></Form.Item>
+            <Form.Item name="calPerHour" label="Calo đốt trung bình/giờ" rules={[{ required: true }]}><InputNumber style={{ width: '100%' }} min={0} /></Form.Item>
+          </Form>
+        </Modal>
+
+        <Modal title="Sửa bài tập" open={isEditModalOpen} onCancel={() => { setIsEditModalOpen(false); setEditingExercise(null); editForm.resetFields(); }} onOk={() => editForm.submit()}>
+          <Form form={editForm} layout="vertical" onFinish={handleUpdateExercise}>
+            <Form.Item name="name" label="Tên bài tập" rules={[{ required: true }]}><Input /></Form.Item>
+            <Form.Item name="muscle" label="Nhóm cơ tác động" rules={[{ required: true }]}><Select options={['Chest', 'Back', 'Legs', 'Shoulders', 'Arms', 'Core', 'Full Body'].map(v => ({ value: v, label: v }))} /></Form.Item>
+            <Form.Item name="difficulty" label="Mức độ khó" rules={[{ required: true }]}><Select options={['Dễ', 'Trung bình', 'Khó'].map(v => ({ value: v, label: v }))} /></Form.Item>
+            <Form.Item name="desc" label="Mô tả ngắn"><Input.TextArea rows={3} /></Form.Item>
+            <Form.Item name="calPerHour" label="Calo đốt trung bình/giờ" rules={[{ required: true }]}><InputNumber style={{ width: '100%' }} min={0} /></Form.Item>
+          </Form>
+        </Modal>
       </div>
     );
   };
 
   return (
-    <div className="ung-dung">
-      <nav className="thanh-dieu-huong">
-        <button className={trangHienTai === 'trang-chu' ? 'dang-chon' : ''} onClick={() => chuyenTrang('trang-chu')}>Trang chủ</button>
-        <button className={trangHienTai === 'gioi-thieu' ? 'dang-chon' : ''} onClick={() => chuyenTrang('gioi-thieu')}>Giới thiệu</button>
-        <div style={{ flex: 1 }} />
-        <button className={trangHienTai === 'quan-ly-bai-viet' ? 'dang-chon' : ''} onClick={() => chuyenTrang('quan-ly-bai-viet')}>QL Bài viết</button>
-        <button className={trangHienTai === 'quan-ly-the' ? 'dang-chon' : ''} onClick={() => chuyenTrang('quan-ly-the')}>QL Thẻ</button>
-      </nav>
-      <main>
-        {trangHienTai === 'trang-chu' && renderTrangChu()}
-        {trangHienTai === 'chi-tiet' && renderChiTiet()}
-        {trangHienTai === 'gioi-thieu' && renderGioiThieu()}
-        {trangHienTai === 'quan-ly-bai-viet' && renderQuanLyBaiViet()}
-        {trangHienTai === 'quan-ly-the' && renderQuanLyThe()}
-      </main>
-    </div>
+    <Layout style={{ minHeight: '100vh' }}>
+      <Sider theme="light" width={250}>
+        <div style={{ padding: 16, textAlign: 'center' }}><Title level={3} style={{ color: '#1890ff', margin: 0 }}>FitTrack Pro</Title></div>
+        <Menu
+          mode="inline"
+          selectedKeys={[activeMenu]}
+          onClick={(e) => setActiveMenu(e.key)}
+          items={[
+            { key: '1', icon: <DashboardOutlined />, label: 'Dashboard' },
+            { key: '2', icon: <BookOutlined />, label: 'Nhật ký tập luyện' },
+            { key: '3', icon: <HeartOutlined />, label: 'Nhật ký chỉ số' },
+            { key: '4', icon: <TagOutlined />, label: 'Quản lý mục tiêu' },
+            { key: '5', icon: <PlaySquareOutlined />, label: 'Thư viện bài tập' },
+          ]}
+        />
+      </Sider>
+      <Layout>
+        <Header style={{ background: '#fff', padding: '0 24px' }}>
+          <Title level={4} style={{ lineHeight: '64px', margin: 0 }}>
+            {['Dashboard', 'Nhật ký tập luyện', 'Nhật ký chỉ số sức khỏe', 'Quản lý mục tiêu', 'Thư viện bài tập'][parseInt(activeMenu) - 1]}
+          </Title>
+        </Header>
+        <Content style={{ margin: '24px 16px', padding: 24, background: '#fff', borderRadius: 8, overflow: 'initial' }}>
+          {activeMenu === '1' && <DashboardView />}
+          {activeMenu === '2' && <WorkoutLogView />}
+          {activeMenu === '3' && <HealthMetricsView />}
+          {activeMenu === '4' && <GoalManagementView />}
+          {activeMenu === '5' && <ExerciseLibraryView />}
+        </Content>
+      </Layout>
+    </Layout>
   );
 }
