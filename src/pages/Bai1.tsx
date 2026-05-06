@@ -1,342 +1,345 @@
-import React, { useState, useEffect } from 'react';
-import ReactMarkdown from 'react-markdown';
-import './Bai1.css';
+import React, { useState, useEffect, useMemo } from 'react';
+import {
+  Tabs, Card, Row, Col, Statistic, Table, Tag, Button,
+  Modal, Form, Input, Select, DatePicker, Space, Popconfirm, message
+} from 'antd';
+import { PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined } from '@ant-design/icons';
+import { DragDropContext, Droppable, Draggable, DropResult } from 'react-beautiful-dnd';
+import dayjs, { Dayjs } from 'dayjs';
 
-type TrangThaiBaiViet = 'Nhap' | 'DaDang';
+export type TaskStatus = 'todo' | 'in-progress' | 'done';
+export type Priority = 'high' | 'medium' | 'low';
 
-interface Tag {
+export interface Task {
   id: string;
-  ten: string;
+  name: string;
+  description: string;
+  status: TaskStatus;
+  deadline: string;
+  priority: Priority;
+  tags: string[];
 }
 
-interface BaiViet {
-  id: string;
-  tieuDe: string;
-  slug: string;
-  tomTat: string;
-  noiDung: string;
-  anhDaiDien: string;
-  ngayDang: string;
-  tacGia: string;
-  danhSachTheId: string[];
-  luotXem: number;
-  trangThai: TrangThaiBaiViet;
-}
+const LOCAL_STORAGE_KEY = 'my_tasks_data';
 
-
-const duLieuTheMau: Tag[] = [
-  { id: 't1', ten: 'Ẩm thực' },
-  { id: 't2', ten: 'Du lịch' },
-  { id: 't3', ten: 'Thiên nhiên' },
-  { id: 't4', ten: 'Kỳ quan' },
-];
-
-const taoBaiVietMau = (): BaiViet[] => {
-  const titles = [
-    { td: 'Phở Hà Nội – hương vị truyền thống', tag: 't1', tom: 'Quy trình nấu phở chuẩn vị Bắc' },
-    { td: 'Du lịch Đà Lạt mùa hoa dã quỳ', tag: 't2', tom: 'Kinh nghiệm di chuyển, lưu trú và ăn uống' },
-    { td: 'Vẻ đẹp của rừng Cúc Phương', tag: 't3', tom: 'Khám phá hệ sinh thái đa dạng' },
-    { td: 'Kỳ quan Machu Picchu – thành phố mất tích', tag: 't4', tom: 'Bí ẩn chưa lời giải' },
-    { td: 'Bún chả Hà Nội – ngon khó cưỡng', tag: 't1', tom: 'Công thức gia truyền từ phố cổ' },
-    { td: 'Sapa – thung lũng mây ngàn', tag: 't2', tom: 'Lịch trình trekking 2 ngày' },
-    { td: 'Vịnh Hạ Long – kỳ quan thiên nhiên thế giới', tag: 't3', tom: 'Những hang động kỳ bí' },
-    { td: 'Taj Mahal – biểu tượng tình yêu', tag: 't4', tom: 'Câu chuyện đằng sau công trình' },
-    { td: 'Cơm tấm Sài Gòn', tag: 't1', tom: 'Sự khác biệt giữa các vùng miền' },
-    { td: 'Hội An – phố cổ lung linh', tag: 't2', tom: 'Top 10 món ăn đường phố' },
-  ];
-  return titles.map((item, idx) => ({
-    id: `bv${idx + 1}`,
-    tieuDe: item.td,
-    slug: item.td.toLowerCase().replace(/[^\w\s]/g, '').replace(/\s+/g, '-'),
-    tomTat: item.tom,
-    noiDung: `## ${item.td}\n\nNội dung chi tiết đang được cập nhật...\n\n**Điểm nhấn**: ...\n\n- Mục 1\n- Mục 2`,
-    anhDaiDien: `https://picsum.photos/seed/${idx + 200}/400/250`,
-    ngayDang: new Date(Date.now() - idx * 86400000).toISOString().split('T')[0],
-    tacGia: 'Nguyen Van A',  
-    danhSachTheId: [item.tag],
-    luotXem: Math.floor(Math.random() * 500),
-    trangThai: idx === 9 ? 'Nhap' : 'DaDang',
-  }));
+const STATUS_MAP: Record<TaskStatus, { label: string; color: string }> = {
+  'todo': { label: 'Cần làm', color: 'default' },
+  'in-progress': { label: 'Đang làm', color: 'processing' },
+  'done': { label: 'Hoàn thành', color: 'success' },
 };
 
-const duLieuBaiVietMau = taoBaiVietMau();
-
-const IconTimKiem = () => (<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>);
-const IconQuayLai = () => (<svg viewBox="0 0 24 24"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>);
-const IconSua = () => (<svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>);
-const IconXoa = () => (<svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>);
-const IconThem = () => (<svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>);
-const IconMat = () => (<svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>);
-
-export default function UngDungBlog() {
-  const [trangHienTai, setTrangHienTai] = useState<'trang-chu' | 'chi-tiet' | 'gioi-thieu' | 'quan-ly-bai-viet' | 'quan-ly-the'>('trang-chu');
-  const [danhSachBaiViet, setDanhSachBaiViet] = useState<BaiViet[]>(duLieuBaiVietMau);
-  const [danhSachThe, setDanhSachThe] = useState<Tag[]>(duLieuTheMau);
-  const [tuKhoaTimKiem, setTuKhoaTimKiem] = useState('');
-  const [tuKhoaDebounced, setTuKhoaDebounced] = useState('');
-  const [theDuocChon, setTheDuocChon] = useState<string | null>(null);
-  const [trangSo, setTrangSo] = useState(1);
-  const [idBaiVietDangXem, setIdBaiVietDangXem] = useState<string | null>(null);
-  const [tuKhoaQuanLyBV, setTuKhoaQuanLyBV] = useState('');
-  const [locTrangThaiBV, setLocTrangThaiBV] = useState<TrangThaiBaiViet | 'TatCa'>('TatCa');
-  const [baiVietDangSua, setBaiVietDangSua] = useState<BaiViet | null>(null);
-  const [theDangSua, setTheDangSua] = useState<Tag | null>(null);
-
-  useEffect(() => {
-    const timer = setTimeout(() => { setTuKhoaDebounced(tuKhoaTimKiem); setTrangSo(1); }, 300);
-    return () => clearTimeout(timer);
-  }, [tuKhoaTimKiem]);
-
-  useEffect(() => {
-    if (trangHienTai === 'chi-tiet' && idBaiVietDangXem) {
-      setDanhSachBaiViet(prev => prev.map(bv => bv.id === idBaiVietDangXem ? { ...bv, luotXem: bv.luotXem + 1 } : bv));
-    }
-  }, [trangHienTai, idBaiVietDangXem]);
-
-  const layTenTheTuId = (ids: string[]) => danhSachThe.filter(t => ids.includes(t.id));
-  const chuyenTrang = (trang: typeof trangHienTai) => { setTrangHienTai(trang); window.scrollTo(0, 0); };
-
-  const renderTrangChu = () => {
-    let baiVietDaLoc = danhSachBaiViet.filter(bv => bv.trangThai === 'DaDang');
-    if (theDuocChon) baiVietDaLoc = baiVietDaLoc.filter(bv => bv.danhSachTheId.includes(theDuocChon));
-    if (tuKhoaDebounced) {
-      const kw = tuKhoaDebounced.toLowerCase();
-      baiVietDaLoc = baiVietDaLoc.filter(bv => bv.tieuDe.toLowerCase().includes(kw) || bv.tomTat.toLowerCase().includes(kw));
-    }
-    const pageSize = 9;
-    const total = Math.ceil(baiVietDaLoc.length / pageSize);
-    const visible = baiVietDaLoc.slice((trangSo - 1) * pageSize, trangSo * pageSize);
-    return (
-      <div>
-        <div style={{ display: 'flex', gap: 15, marginBottom: 20 }}>
-          <div style={{ position: 'relative', flex: 1 }}>
-            <span style={{ position: 'absolute', top: 10, left: 10, color: 'var(--mau-chu-nhat)' }}><IconTimKiem /></span>
-            <input type="text" className="o-nhap" style={{ paddingLeft: 35, marginBottom: 0 }} placeholder="Tìm kiếm bài viết..." value={tuKhoaTimKiem} onChange={e => setTuKhoaTimKiem(e.target.value)} />
-          </div>
-          <div className="danh-sach-tag" style={{ margin: 0, alignItems: 'center' }}>
-            <span className={`tag ${theDuocChon === null ? 'dang-chon' : ''}`} onClick={() => { setTheDuocChon(null); setTrangSo(1); }}>Tất cả</span>
-            {danhSachThe.map(t => <span key={t.id} className={`tag ${theDuocChon === t.id ? 'dang-chon' : ''}`} onClick={() => { setTheDuocChon(t.id); setTrangSo(1); }}>{t.ten}</span>)}
-          </div>
-        </div>
-        <div className="luoi-bai-viet">
-          {visible.map(bv => (
-            <div key={bv.id} className="the-bai-viet" onClick={() => { setIdBaiVietDangXem(bv.id); chuyenTrang('chi-tiet'); }}>
-              <img src={bv.anhDaiDien} alt={bv.tieuDe} />
-              <div className="noi-dung">
-                <div className="danh-sach-tag">{layTenTheTuId(bv.danhSachTheId).map(t => <span key={t.id} className="tag">{t.ten}</span>)}</div>
-                <h3>{bv.tieuDe}</h3>
-                <p>{bv.tomTat}</p>
-                <div className="thong-tin-phu"><span>{bv.tacGia}</span><span>{bv.ngayDang}</span></div>
-              </div>
-            </div>
-          ))}
-          {visible.length === 0 && <p>Không có bài viết.</p>}
-        </div>
-        {total > 1 && <div className="phan-trang">{Array.from({ length: total }).map((_, i) => <button key={i} className={trangSo === i + 1 ? 'hien-tai' : ''} onClick={() => setTrangSo(i + 1)}>{i + 1}</button>)}</div>}
-      </div>
-    );
-  };
-
-const renderChiTiet = () => {
-  const baiViet = danhSachBaiViet.find((bv) => bv.id === idBaiVietDangXem);
-  if (!baiViet) return <div>Không tìm thấy bài viết.</div>;
-
-  const baiVietLienQuan = danhSachBaiViet
-    .filter(
-      (bv) =>
-        bv.id !== baiViet.id &&
-        bv.trangThai === 'DaDang' &&
-        bv.danhSachTheId.some((id) => baiViet.danhSachTheId.includes(id))
-    )
-    .slice(0, 3);
-
-  return (
-    <div className="khung-chua">
-      <button
-        className="nut-bam phu"
-        style={{ marginBottom: '20px' }}
-        onClick={() => chuyenTrang('trang-chu')}
-      >
-        <IconQuayLai /> Quay lại danh sách
-      </button>
-      <img
-        src={baiViet.anhDaiDien}
-        alt="Ảnh đại diện"
-        style={{
-          width: '100%',
-          height: '400px',
-          objectFit: 'cover',
-          borderRadius: '8px',
-          marginBottom: '20px',
-        }}
-      />
-      <h1 className="tieu-de-chinh">{baiViet.tieuDe}</h1>
-
-      <div
-        style={{
-          display: 'flex',
-          gap: '20px',
-          color: 'var(--mau-chu-nhat)',
-          marginBottom: '20px',
-          borderBottom: '1px solid var(--mau-vien)',
-          paddingBottom: '20px',
-        }}
-      >
-        <span>
-          Tác giả: <b>{baiViet.tacGia}</b>
-        </span>
-        <span>Ngày đăng: {baiViet.ngayDang}</span>
-        <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-          <IconMat /> {baiViet.luotXem} lượt xem
-        </span>
-      </div>
-
-      <div className="danh-sach-tag">
-        {layTenTheTuId(baiViet.danhSachTheId).map((t) => (
-          <span key={t.id} className="tag">
-            {t.ten}
-          </span>
-        ))}
-      </div>
-
-      <div className="noi-dung-markdown" style={{ marginTop: '20px', lineHeight: 1.8 }}>
-        <ReactMarkdown>{baiViet.noiDung}</ReactMarkdown>
-      </div>
-
-      {baiVietLienQuan.length > 0 && (
-        <div
-          style={{
-            marginTop: '50px',
-            paddingTop: '20px',
-            borderTop: '1px solid var(--mau-vien)',
-          }}
-        >
-          <h3>Bài viết liên quan</h3>
-          <div className="luoi-bai-viet" style={{ marginTop: '15px' }}>
-            {baiVietLienQuan.map((bv) => (
-              <div
-                key={bv.id}
-                className="the-bai-viet"
-                onClick={() => setIdBaiVietDangXem(bv.id)}
-              >
-                <img src={bv.anhDaiDien} alt={bv.tieuDe} style={{ height: '120px' }} />
-                <div className="noi-dung">
-                  <h3 style={{ fontSize: '16px' }}>{bv.tieuDe}</h3>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  );
+const PRIORITY_MAP: Record<Priority, { label: string; color: string }> = {
+  'high': { label: 'Cao', color: 'red' },
+  'medium': { label: 'Trung bình', color: 'orange' },
+  'low': { label: 'Thấp', color: 'green' },
 };
 
-  const renderGioiThieu = () => (
-    <div className="khung-chua" style={{ textAlign: 'center', maxWidth: 600, margin: '0 auto' }}>
-      <img src="https://www.vietnamworks.com/hrinsider/wp-content/uploads/2023/12/anh-den-ngau-005.jpg" alt="Avatar" style={{ borderRadius: '50%', width: 150, height: 150, marginBottom: 20 }} />
-      <h2>Nguyen Van A</h2>
-      <p style={{ color: 'var(--mau-chu-nhat)', marginBottom: 20 }}>Đam mê ẩm thực & du lịch | Blog chia sẻ trải nghiệm thực tế</p>
-      <p>Xin chào! Tôi thích xê dịch, thưởng thức món ngon và khám phá kỳ quan thiên nhiên. Hy vọng truyền cảm hứng cho bạn!</p>
-      <div style={{ marginTop: 20, display: 'flex', justifyContent: 'center', gap: 10 }}>
-        {danhSachThe.map(t => <span key={t.id} className="tag">{t.ten}</span>)}
-      </div>
-      <div style={{ marginTop: 30, display: 'flex', justifyContent: 'center', gap: 20 }}>
-        <a href="https://www.facebook.com" style={{ color: 'var(--mau-chu-dao)' }}>Facebook</a>
-        <a href="https://www.youtube.com" style={{ color: 'var(--mau-chu-dao)' }}>YouTube</a>
-      </div>
-    </div>
-  );
+export default function TaskTracker() {
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [searchText, setSearchText] = useState('');
+  const [form] = Form.useForm();
 
-  const renderQuanLyBaiViet = () => {
-    if (baiVietDangSua) {
-      const handleSave = (e: React.FormEvent<HTMLFormElement>) => {
-        e.preventDefault();
-        const form = new FormData(e.currentTarget);
-        const updated: BaiViet = {
-          ...baiVietDangSua,
-          id: baiVietDangSua.id || `bv_${Date.now()}`,
-          tieuDe: form.get('tieuDe') as string,
-          slug: form.get('slug') as string,
-          tomTat: form.get('tomTat') as string,
-          noiDung: form.get('noiDung') as string,
-          anhDaiDien: form.get('anhDaiDien') as string,
-          trangThai: form.get('trangThai') as TrangThaiBaiViet,
-          tacGia: 'Nguyen Van A',
-          ngayDang: baiVietDangSua.ngayDang || new Date().toISOString().split('T')[0],
-          luotXem: baiVietDangSua.luotXem || 0,
-          danhSachTheId: form.getAll('danhSachTheId') as string[],
-        };
-        if (baiVietDangSua.id) setDanhSachBaiViet(prev => prev.map(b => b.id === updated.id ? updated : b));
-        else setDanhSachBaiViet([updated, ...danhSachBaiViet]);
-        setBaiVietDangSua(null);
-      };
-      return (
-        <div className="khung-chua">
-          <h2>{baiVietDangSua.id ? 'Sửa bài viết' : 'Thêm bài viết mới'}</h2>
-          <form onSubmit={handleSave}>
-            {['tieuDe', 'slug', 'anhDaiDien', 'tomTat', 'noiDung'].map(field => (
-              <div key={field} className="nhom-form">
-                <label>{field === 'anhDaiDien' ? 'Ảnh URL' : field === 'tomTat' ? 'Tóm tắt' : field === 'noiDung' ? 'Nội dung' : field}</label>
-                {field === 'tomTat' ? <textarea name={field} className="o-nhap" defaultValue={baiVietDangSua[field as keyof BaiViet] as string} required style={{ minHeight: 60 }} />
-                 : field === 'noiDung' ? <textarea name={field} className="o-nhap" defaultValue={baiVietDangSua[field as keyof BaiViet] as string} required style={{ minHeight: 150 }} />
-                 : <input name={field} className="o-nhap" defaultValue={baiVietDangSua[field as keyof BaiViet] as string} required />}
-              </div>
-            ))}
-            <div className="nhom-form"><label>Trạng thái</label><select name="trangThai" className="o-nhap" defaultValue={baiVietDangSua.trangThai}><option value="DaDang">Đã đăng</option><option value="Nhap">Nháp</option></select></div>
-            <div className="nhom-form"><label>Thẻ (Ctrl+Click)</label><select name="danhSachTheId" multiple className="o-nhap" style={{ height: 100 }} defaultValue={baiVietDangSua.danhSachTheId}>{danhSachThe.map(t => <option key={t.id} value={t.id}>{t.ten}</option>)}</select></div>
-            <div className="hanh-dong"><button type="submit" className="nut-bam">Lưu</button><button type="button" className="nut-bam phu" onClick={() => setBaiVietDangSua(null)}>Hủy</button></div>
-          </form>
-        </div>
-      );
+  useEffect(() => {
+    const savedTasks = localStorage.getItem(LOCAL_STORAGE_KEY);
+    if (savedTasks) {
+      try {
+        setTasks(JSON.parse(savedTasks));
+      } catch (e) {
+        console.error("Failed to parse tasks from localStorage");
+      }
     }
-    const filtered = danhSachBaiViet.filter(bv => (locTrangThaiBV === 'TatCa' || bv.trangThai === locTrangThaiBV) && bv.tieuDe.toLowerCase().includes(tuKhoaQuanLyBV.toLowerCase()));
-    return (
-      <div className="khung-chua">
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 20 }}><h2 className="tieu-de-chinh">Quản lý bài viết</h2><button className="nut-bam" onClick={() => setBaiVietDangSua({ id: '', tieuDe: '', slug: '', tomTat: '', noiDung: '', anhDaiDien: '', ngayDang: '', tacGia: 'Lê Khám Phá', danhSachTheId: [], luotXem: 0, trangThai: 'Nhap' })}><IconThem /> Thêm mới</button></div>
-        <div style={{ display: 'flex', gap: 15, marginBottom: 20 }}><input className="o-nhap" style={{ flex: 2, marginBottom: 0 }} placeholder="Tìm tiêu đề..." value={tuKhoaQuanLyBV} onChange={e => setTuKhoaQuanLyBV(e.target.value)} /><select className="o-nhap" style={{ flex: 1, marginBottom: 0 }} value={locTrangThaiBV} onChange={e => setLocTrangThaiBV(e.target.value as any)}><option value="TatCa">Tất cả</option><option value="DaDang">Đã đăng</option><option value="Nhap">Nháp</option></select></div>
-        <div style={{ overflowX: 'auto' }}>
-          <table className="bang-quan-ly"><thead><tr><th>Tiêu đề</th><th>Trạng thái</th><th>Thẻ</th><th>Lượt xem</th><th>Ngày tạo</th><th>Thao tác</th></tr></thead><tbody>{filtered.map(bv => (<tr key={bv.id}><td>{bv.tieuDe}</td><td><span className={`tag ${bv.trangThai === 'DaDang' ? 'dang-chon' : ''}`}>{bv.trangThai === 'DaDang' ? 'Đã đăng' : 'Nháp'}</span></td><td>{layTenTheTuId(bv.danhSachTheId).map(t => t.ten).join(', ')}</td><td>{bv.luotXem}</td><td>{bv.ngayDang}</td><td><div className="hanh-dong"><button className="nut-bam phu" style={{ padding: 6 }} onClick={() => setBaiVietDangSua(bv)}><IconSua /></button><button className="nut-bam nguy-hiem" style={{ padding: 6 }} onClick={() => { if (window.confirm('Xóa?')) setDanhSachBaiViet(prev => prev.filter(b => b.id !== bv.id)); }}><IconXoa /></button></div></td></tr>))}</tbody></table>
-        </div>
-      </div>
-    );
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(tasks));
+  }, [tasks]);
+
+  const stats = useMemo(() => {
+    const total = tasks.length;
+    const done = tasks.filter(t => t.status === 'done').length;
+    const overdue = tasks.filter(t => 
+      t.status !== 'done' && dayjs(t.deadline).isBefore(dayjs(), 'day')
+    ).length;
+    return { total, done, overdue };
+  }, [tasks]);
+
+  const handleOpenModal = (task?: Task) => {
+    if (task) {
+      setEditingTask(task);
+      form.setFieldsValue({
+        ...task,
+        deadline: dayjs(task.deadline)
+      });
+    } else {
+      setEditingTask(null);
+      form.resetFields();
+    }
+    setIsModalOpen(true);
   };
 
+  const handleDelete = (id: string) => {
+    setTasks(prev => prev.filter(t => t.id !== id));
+    message.success('Đã xóa công việc!');
+  };
 
-  const renderQuanLyThe = () => {
-    const handleSaveTag = (e: React.FormEvent<HTMLFormElement>) => {
-      e.preventDefault();
-      const name = (new FormData(e.currentTarget).get('tenThe') as string).trim();
-      if (!name) return;
-      if (theDangSua) setDanhSachThe(prev => prev.map(t => t.id === theDangSua.id ? { ...t, ten: name } : t));
-      else setDanhSachThe([...danhSachThe, { id: `t_${Date.now()}`, ten: name }]);
-      setTheDangSua(null);
+  const handleFinish = (values: any) => {
+    const newTaskData: Task = {
+      id: editingTask ? editingTask.id : Date.now().toString(),
+      name: values.name,
+      description: values.description || '',
+      status: editingTask ? editingTask.status : 'todo',
+      deadline: values.deadline.toISOString(),
+      priority: values.priority,
+      tags: values.tags || [],
     };
+
+    if (editingTask) {
+      setTasks(prev => prev.map(t => t.id === editingTask.id ? newTaskData : t));
+      message.success('Cập nhật công việc thành công!');
+    } else {
+      setTasks(prev => [newTaskData, ...prev]);
+      message.success('Thêm công việc thành công!');
+    }
+    setIsModalOpen(false);
+  };
+
+  const onDragEnd = (result: DropResult) => {
+    if (!result.destination) return;
+    const { source, destination, draggableId } = result;
+
+    if (source.droppableId !== destination.droppableId) {
+      setTasks(prev => prev.map(t => {
+        if (t.id === draggableId) {
+          return { ...t, status: destination.droppableId as TaskStatus };
+        }
+        return t;
+      }));
+    }
+  };
+
+  const DashboardTab = () => (
+    <div style={{ padding: '20px 0' }}>
+      <Row gutter={16}>
+        <Col span={8}>
+          <Card>
+            <Statistic title="Tổng số Task" value={stats.total} />
+          </Card>
+        </Col>
+        <Col span={8}>
+          <Card>
+            <Statistic title="Đã hoàn thành" value={stats.done} valueStyle={{ color: '#3f8600' }} />
+          </Card>
+        </Col>
+        <Col span={8}>
+          <Card>
+            <Statistic title="Quá hạn" value={stats.overdue} valueStyle={{ color: '#cf1322' }} />
+          </Card>
+        </Col>
+      </Row>
+    </div>
+  );
+
+  const KanbanTab = () => {
+    const columns: TaskStatus[] = ['todo', 'in-progress', 'done'];
+
     return (
-      <div className="khung-chua">
-        <h2 className="tieu-de-chinh">Quản lý thẻ</h2>
-        <form onSubmit={handleSaveTag} style={{ display: 'flex', gap: 10, marginBottom: 20 }}><input name="tenThe" className="o-nhap" style={{ marginBottom: 0, flex: 1 }} placeholder="Tên thẻ mới..." defaultValue={theDangSua?.ten || ''} required /><button type="submit" className="nut-bam">{theDangSua ? 'Cập nhật' : 'Thêm'}</button>{theDangSua && <button type="button" className="nut-bam phu" onClick={() => setTheDangSua(null)}>Hủy</button>}</form>
-        <table className="bang-quan-ly"><thead><tr><th>Tên thẻ</th><th>Số bài viết</th><th>Thao tác</th></tr></thead><tbody>{danhSachThe.map(t => (<tr key={t.id}><td><b>{t.ten}</b></td><td>{danhSachBaiViet.filter(bv => bv.danhSachTheId.includes(t.id)).length}</td><td><div className="hanh-dong"><button className="nut-bam phu" style={{ padding: 6 }} onClick={() => setTheDangSua(t)}><IconSua /></button><button className="nut-bam nguy-hiem" style={{ padding: 6 }} onClick={() => { if (window.confirm('Xóa thẻ?')) { setDanhSachThe(prev => prev.filter(x => x.id !== t.id)); setDanhSachBaiViet(prev => prev.map(bv => ({ ...bv, danhSachTheId: bv.danhSachTheId.filter(id => id !== t.id) }))); } }}><IconXoa /></button></div></td></tr>))}</tbody></table>
+      <DragDropContext onDragEnd={onDragEnd}>
+        <div style={{ display: 'flex', gap: '16px', padding: '20px 0', alignItems: 'flex-start' }}>
+          {columns.map(status => {
+            const columnTasks = tasks.filter(t => t.status === status);
+            return (
+              <Droppable droppableId={status} key={status}>
+                {(provided, snapshot) => (
+                  <div
+                    {...provided.droppableProps}
+                    ref={provided.innerRef}
+                    style={{
+                      flex: 1,
+                      background: snapshot.isDraggingOver ? '#e6f7ff' : '#f0f2f5',
+                      padding: '16px',
+                      borderRadius: '8px',
+                      minHeight: '400px'
+                    }}
+                  >
+                    <h3 style={{ marginBottom: '16px', textTransform: 'uppercase' }}>
+                      {STATUS_MAP[status].label} ({columnTasks.length})
+                    </h3>
+                    {columnTasks.map((task, index) => (
+                      <Draggable key={task.id} draggableId={task.id} index={index}>
+                        {(provided, snapshot) => (
+                          <div
+                            ref={provided.innerRef}
+                            {...provided.draggableProps}
+                            {...provided.dragHandleProps}
+                            style={{
+                              userSelect: 'none',
+                              padding: '16px',
+                              margin: '0 0 8px 0',
+                              backgroundColor: 'white',
+                              borderRadius: '4px',
+                              boxShadow: snapshot.isDragging ? '0 4px 8px rgba(0,0,0,0.1)' : '0 1px 2px rgba(0,0,0,0.1)',
+                              ...provided.draggableProps.style
+                            }}
+                          >
+                            <div style={{ fontWeight: 'bold', marginBottom: '8px' }}>{task.name}</div>
+                            <div style={{ fontSize: '12px', color: '#666', marginBottom: '8px' }}>
+                              Hạn: {dayjs(task.deadline).format('DD/MM/YYYY')}
+                            </div>
+                            <Space size={[0, 4]} wrap>
+                              <Tag color={PRIORITY_MAP[task.priority].color}>{PRIORITY_MAP[task.priority].label}</Tag>
+                              {task.tags.map(tag => <Tag key={tag}>{tag}</Tag>)}
+                            </Space>
+                          </div>
+                        )}
+                      </Draggable>
+                    ))}
+                    {provided.placeholder}
+                  </div>
+                )}
+              </Droppable>
+            );
+          })}
+        </div>
+      </DragDropContext>
+    );
+  };
+
+  const ListTab = () => {
+    const filteredTasks = tasks.filter(t => t.name.toLowerCase().includes(searchText.toLowerCase()));
+
+    const columns = [
+      {
+        title: 'Tên Task',
+        dataIndex: 'name',
+        key: 'name',
+      },
+      {
+        title: 'Trạng thái',
+        dataIndex: 'status',
+        key: 'status',
+        filters: [
+          { text: 'Cần làm', value: 'todo' },
+          { text: 'Đang làm', value: 'in-progress' },
+          { text: 'Hoàn thành', value: 'done' },
+        ],
+        onFilter: (value: any, record: Task) => record.status === value,
+        render: (status: TaskStatus) => (
+          <Tag color={STATUS_MAP[status].color}>{STATUS_MAP[status].label}</Tag>
+        ),
+      },
+      {
+        title: 'Mức độ ưu tiên',
+        dataIndex: 'priority',
+        key: 'priority',
+        render: (priority: Priority) => (
+          <Tag color={PRIORITY_MAP[priority].color}>{PRIORITY_MAP[priority].label}</Tag>
+        ),
+      },
+      {
+        title: 'Tags',
+        dataIndex: 'tags',
+        key: 'tags',
+        render: (tags: string[]) => (
+          <>
+            {tags.map(tag => <Tag key={tag}>{tag}</Tag>)}
+          </>
+        ),
+      },
+      {
+        title: 'Deadline',
+        dataIndex: 'deadline',
+        key: 'deadline',
+        sorter: (a: Task, b: Task) => dayjs(a.deadline).valueOf() - dayjs(b.deadline).valueOf(),
+        render: (date: string) => dayjs(date).format('DD/MM/YYYY'),
+      },
+      {
+        title: 'Hành động',
+        key: 'action',
+        render: (_: any, record: Task) => (
+          <Space size="middle">
+            <Button type="text" icon={<EditOutlined />} onClick={() => handleOpenModal(record)} />
+            <Popconfirm title="Bạn có chắc muốn xóa?" onConfirm={() => handleDelete(record.id)}>
+              <Button type="text" danger icon={<DeleteOutlined />} />
+            </Popconfirm>
+          </Space>
+        ),
+      },
+    ];
+
+    return (
+      <div style={{ padding: '20px 0' }}>
+        <div style={{ marginBottom: 16 }}>
+          <Input 
+            placeholder="Tìm kiếm theo tên task..." 
+            prefix={<SearchOutlined />} 
+            value={searchText}
+            onChange={e => setSearchText(e.target.value)}
+            style={{ width: 300 }}
+          />
+        </div>
+        <Table columns={columns} dataSource={filteredTasks} rowKey="id" />
       </div>
     );
   };
 
   return (
-    <div className="ung-dung">
-      <nav className="thanh-dieu-huong">
-        <button className={trangHienTai === 'trang-chu' ? 'dang-chon' : ''} onClick={() => chuyenTrang('trang-chu')}>Trang chủ</button>
-        <button className={trangHienTai === 'gioi-thieu' ? 'dang-chon' : ''} onClick={() => chuyenTrang('gioi-thieu')}>Giới thiệu</button>
-        <div style={{ flex: 1 }} />
-        <button className={trangHienTai === 'quan-ly-bai-viet' ? 'dang-chon' : ''} onClick={() => chuyenTrang('quan-ly-bai-viet')}>QL Bài viết</button>
-        <button className={trangHienTai === 'quan-ly-the' ? 'dang-chon' : ''} onClick={() => chuyenTrang('quan-ly-the')}>QL Thẻ</button>
-      </nav>
-      <main>
-        {trangHienTai === 'trang-chu' && renderTrangChu()}
-        {trangHienTai === 'chi-tiet' && renderChiTiet()}
-        {trangHienTai === 'gioi-thieu' && renderGioiThieu()}
-        {trangHienTai === 'quan-ly-bai-viet' && renderQuanLyBaiViet()}
-        {trangHienTai === 'quan-ly-the' && renderQuanLyThe()}
-      </main>
+    <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '24px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+        <h2>Theo Dõi Công Việc Cá Nhân</h2>
+        <Button type="primary" icon={<PlusOutlined />} onClick={() => handleOpenModal()}>
+          Thêm Task mới
+        </Button>
+      </div>
+
+      <Tabs
+        defaultActiveKey="dashboard"
+        items={[
+          { key: 'dashboard', label: 'Dashboard', children: <DashboardTab /> },
+          { key: 'kanban', label: 'Kanban Board', children: <KanbanTab /> },
+          { key: 'list', label: 'Danh sách Task', children: <ListTab /> },
+        ]}
+      />
+
+      <Modal
+        title={editingTask ? "Chỉnh sửa công việc" : "Thêm công việc mới"}
+        open={isModalOpen}
+        onOk={() => form.submit()}
+        onCancel={() => setIsModalOpen(false)}
+        destroyOnClose
+      >
+        <Form form={form} layout="vertical" onFinish={handleFinish}>
+          <Form.Item name="name" label="Tên công việc" rules={[{ required: true, message: 'Vui lòng nhập tên task!' }]}>
+            <Input placeholder="Nhập tên công việc" />
+          </Form.Item>
+          
+          <Form.Item name="description" label="Mô tả">
+            <Input.TextArea rows={3} placeholder="Mô tả chi tiết" />
+          </Form.Item>
+
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item name="deadline" label="Deadline" rules={[{ required: true, message: 'Vui lòng chọn ngày!' }]}>
+                <DatePicker style={{ width: '100%' }} format="DD/MM/YYYY" />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item name="priority" label="Mức độ ưu tiên" rules={[{ required: true, message: 'Vui lòng chọn!' }]}>
+                <Select placeholder="Chọn mức độ">
+                  <Select.Option value="high">Cao</Select.Option>
+                  <Select.Option value="medium">Trung bình</Select.Option>
+                  <Select.Option value="low">Thấp</Select.Option>
+                </Select>
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Form.Item name="tags" label="Tag (Phân loại)">
+            <Select mode="tags" placeholder="Gõ để thêm tag mới" style={{ width: '100%' }} />
+          </Form.Item>
+        </Form>
+      </Modal>
     </div>
   );
 }
