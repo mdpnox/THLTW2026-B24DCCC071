@@ -82,7 +82,7 @@
 
 	{
     path: '/bai-1',
-    name: 'Ứng dụng Blog cá nhân',
+    name: 'Ứng dụng theo dõi công việc cá nhân',
     icon: 'book',
     component: './Bai1',
   },
